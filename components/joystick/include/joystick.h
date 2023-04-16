@@ -1,10 +1,7 @@
-#ifndef __CONTROLLER_H__
-#define __CONTROLLER_H__
+#ifndef __JOYSTICK_SHIELD_V1A_H__
+#define __JOYSTICK_SHIELD_V1A_H__
 
-#include <stdio.h>
 #include <stdint.h>
-#include <unistd.h>
-#include <string.h>
 
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
@@ -107,4 +104,4 @@ void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick);
 int8_t read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis);
 
 
-#endif // __CONTROLLER_H__
+#endif // __JOYSTICK_SHIELD_V1A_H__

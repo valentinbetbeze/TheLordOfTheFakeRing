@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "joystick.h": "c",
+        "st7735s.h": "c",
+        "esp_timer.h": "c",
+        "esp_err.h": "c",
+        "ets_sys.h": "c",
+        "unistd.h": "c"
+    }
+}
