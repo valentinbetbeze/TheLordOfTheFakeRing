@@ -1,19 +1,25 @@
-#include <stdio.h>
+/**
+ * @file TheLordOfTheFakeRing.c
+ * @author valentin betbeze (valentin.betbeze@gmail.com)
+ * @brief Main code of the game.
+ * @version 0.1
+ * @date 2023-04-16
+ * 
+ * @note
+ */
 
+#include <stdio.h>
+#include <unistd.h>
+
+#include "rom/ets_sys.h"
 #include "joystick.h"
 #include "st7735s.h"
-#include "rom/ets_sys.h"
+#include "graphics.h"
+
 
 spi_device_handle_t tft_handle;
 
 
-/**
- * TODO: 16/04/2023
- * Think about which structs to make (pixels, sprites, ect), take the color thing in mind
- * Make orientation functions
- * Have another look at the datasheet and make any other useful functions
- * Optimize refresh rate (instead of updating each pixel with a for loop, make sure an entire frame can be passed through send_data() and do it)
- */
 void app_main()
 {
     // Initialize SPI bus
@@ -35,10 +41,9 @@ void app_main()
     init_tft();
 
     // Fill screen with unicolor
-    //uint16_t color = RGB888_to_RGB565(255, 255, 255);
     uint16_t color = hex_RGB888_to_RGB565(0x0000FF);
     uint8_t data[2] = {color >> 8, color & 0xFF};
-    set_write_area(0, 0, 127, 159);
+    set_display_area(0, 0, 127, 159);
     for (int i = 0; i < (128 * 160); i++)
     {
         send_data(data, sizeof(data));
@@ -46,7 +51,7 @@ void app_main()
 
     while(1)
     {
-        ets_delay_us(100*1000);
+        sleep(1);
     }
 }
 

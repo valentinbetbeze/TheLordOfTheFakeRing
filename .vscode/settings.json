@@ -5,6 +5,13 @@
         "esp_timer.h": "c",
         "esp_err.h": "c",
         "ets_sys.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "graphics.h": "c",
+        "*.tcc": "c",
+        "cmath": "c",
+        "condition_variable": "c",
+        "chrono": "c",
+        "string_view": "c",
+        "regex": "c"
     }
 }

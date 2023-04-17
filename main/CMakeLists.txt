@@ -1,6 +1,7 @@
 set(LIB
     joystick
     st7735s
+    graphics
     esp_rom
 )
 
