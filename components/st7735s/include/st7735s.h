@@ -2,104 +2,23 @@
  * @file st7735s.h
  * @author valentin betbeze (valentin.betbeze@gmail.com)
  * @brief Header file of the ST7735S driver for the ESP32-WROOM-32
- * @version 1.0.3
  * @date 2023-04-16
  * 
- * @note The following sections can and should be modified
- *       according to the hardware setup used:
-*           - GPIOs
-*           - SPI parameters
-*           - Display parameters
  * @warning Do not modify any value between parenthesis '()'.
  */
+
+#ifndef __ST7735S_H__
+#define __ST7735S_H__
 
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
 
-#include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "driver/ledc.h"
 #include "esp_err.h"
 #include "rom/ets_sys.h"
-
-/*************************************************
- * GPIOs
- ************************************************/
-#define PIN_LCD_SCK         GPIO_NUM_18     /* Serial Clock             */
-#define PIN_LCD_SDA         GPIO_NUM_23     /* Bi-directional MOSI/MISO */
-#define PIN_LCD_CS          GPIO_NUM_5      /* Chip Selection           */
-#define PIN_LCD_RES         GPIO_NUM_2      /* Reset                    */
-#define PIN_LCD_DC          GPIO_NUM_15     /* Register Selection       */
-#define PIN_LCD_BKL         GPIO_NUM_16     /* Background light         */
-
-/*************************************************
- * Display parameters
- ************************************************/
-#define LCD_MEMORY_BASE     0b11            /* Resolution parameter     */
-#define LCD_COLOR_FORMAT    (0x05)          /* 16-bit/pixel             */
-#define LCD_RTNA            0x00
-#define LCD_FPA             0x06
-#define LCD_BPA             0x03
-#define LCD_MH              0x00
-#define LCD_RGB             0x00
-#define LCD_ML              0x00
-#define LCD_MV              0x00
-#define LCD_MX              0x00
-#define LCD_MY              0x00
-#define LCD_GAMMA           0x01            /* Gamma Curve 0            */
-
-#define PWM_LCD_GROUP       LEDC_TIMER_0
-#define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
-#define PWM_LCD_MODE        LEDC_LOW_SPEED_MODE
-#define PWM_LCD_FREQ        5000
-#define PWM_LCD_RESOLUTION  LEDC_TIMER_4_BIT
-
-#if (LCD_MEMORY_BASE == 0b00)
-    #define LCD_HEIGHT      (162)           /* pixels                   */
-    #define LCD_WIDTH       (132)           /* pixels                   */
-#elif (LCD_MEMORY_BASE == 0b01)
-    #define LCD_HEIGHT      (132)           /* pixels                   */
-    #define LCD_WIDTH       (132)           /* pixels                   */
-#elif (LCD_MEMORY_BASE == 0b11)
-    #define LCD_HEIGHT      (160)           /* pixels                   */
-    #define LCD_WIDTH       (128)           /* pixels                   */
-#else
-    #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
-#endif
-
-/*************************************************
- * SPI parameters
- ************************************************/
-#define SPI_LCD_FREQUENCY   SPI_MASTER_FREQ_26M
-#define SPI_LCD_FLAGS       SPI_DEVICE_3WIRE | SPI_DEVICE_HALFDUPLEX
-#define SPI_LCD_QSIZE       1
-#define SPI_LCD_HOST        VSPI_HOST
-#define SPI_LCD_MODE        (0)
-#define SPI_LCD_DMA         SPI_DMA_DISABLED
-
-// NUM_TRANSACTION = (LCD_HEIGHT * LCD_WIDTH * 2 / MAX_TRANSFER_SIZE) (rounded up)
-#if (SPI_LCD_DMA)
-    #define MAX_TRANSFER_SIZE       (4092)
-    #if (LCD_MEMORY_BASE == 0b00)
-        #define NUM_TRANSACTIONS    (11)
-    #elif (LCD_MEMORY_BASE == 0b01)
-        #define NUM_TRANSACTIONS    (9)
-    #elif (LCD_MEMORY_BASE == 0b11)
-        #define NUM_TRANSACTIONS    (11)
-    #endif
-#else
-    #define MAX_TRANSFER_SIZE       (64)
-    #if (LCD_MEMORY_BASE == 0b00)
-        #define NUM_TRANSACTIONS    (669)
-    #elif (LCD_MEMORY_BASE == 0b01)
-        #define NUM_TRANSACTIONS    (545)
-    #elif (LCD_MEMORY_BASE == 0b11)
-        #define NUM_TRANSACTIONS    (640)
-    #endif
-#endif
-#define PX_PER_TRANSACTION  (MAX_TRANSFER_SIZE / 2)
 
 /*************************************************
  * ST7735S functions (System/Panel)
@@ -179,6 +98,14 @@ extern spi_device_handle_t tft_handle;
 void init_spi(void);
 
 /**
+ * @brief Check if the size of the data is valid for SPI transfer.
+ * 
+ * @param len Amount of data in byte.
+ * @return 0 on success, else 1
+ */
+int check_data_size(size_t len);
+
+/**
  * @brief Send a command to the ST7735S chip.
  * 
  * @param command 8-bit command (see ST7735S datasheet p.104)
@@ -186,16 +113,20 @@ void init_spi(void);
 void send_command(uint8_t command);
 
 /**
- * @brief Send data to the ST7735S chip.
+ * @brief Send a byte to the ST7735S chip.
  * 
- * @param data Pointer to the data to be sent. Preferably an 8-bit
- * array of size 64 for maximum efficiency.
- * @param len Size of the array in bytes.
- * 
- * @note With DMA disabled, a maximum of 64 bytes can be sent with 1 SPI
- * transaction.
+ * @param data Pointer to the data to be sent.
+ * @param len Amount of data in byte.
  */
-void send_data(uint8_t *data, int len);
+void send_byte(uint8_t *data, size_t len);
+
+/**
+ * @brief Send a WORD (2 bytes) to the ST7735S chip.
+ * 
+ * @param data Pointer to the data to be sent.
+ * @param len Amount of data in byte.
+ */
+void send_word(uint16_t *data, size_t len);
 
 /**
  * @brief Initialize the TFT display.
@@ -231,7 +162,7 @@ void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye);
  * @brief Check that the frame size doesn't exceed the ST7725S memory size.
  * 
  * @param len Size of the frame in bytes.
- * @return 0 if success, 1 if error/warning
+ * @return 0 on success, else 1
  */
 int check_frame_size(int len);
 
@@ -243,4 +174,7 @@ int check_frame_size(int len);
  * LCD_WIDTH pixels.
  * @param len Size of the frame in bytes.
  */
-void push_frame(uint16_t *frame, int len);
+void push_frame(uint16_t **frame, int len);
+//void push_frame(uint16_t *frame, int len);
+
+#endif // __ST7735S_H__

@@ -15,6 +15,7 @@
 #include "joystick.h"
 #include "st7735s.h"
 #include "graphics.h"
+#include "project_config.h"
 
 
 spi_device_handle_t tft_handle;
@@ -42,11 +43,10 @@ void app_main()
 
     // Fill screen with unicolor
     uint16_t color = hex_RGB888_to_RGB565(0x0000FF);
-    uint8_t data[2] = {color >> 8, color & 0xFF};
-    set_display_area(0, 0, 127, 159);
-    for (int i = 0; i < (128 * 160); i++)
+    set_display_area(0, 127, 0, 159);
+    for (int i = 0; i < (128*160); i++)
     {
-        send_data(data, sizeof(data));
+        send_word(&color, sizeof(color));
     }
 
     while(1)

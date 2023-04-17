@@ -1,12 +1,8 @@
 set(LIB
     driver
-    esp_rom
-    esp_common
-    project_config
 )
 
 idf_component_register(
-                        SRCS "st7735s.c"
                         INCLUDE_DIRS "include"
                         REQUIRES ${LIB}
 )

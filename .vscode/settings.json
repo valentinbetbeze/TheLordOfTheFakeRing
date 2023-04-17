@@ -12,6 +12,8 @@
         "condition_variable": "c",
         "chrono": "c",
         "string_view": "c",
-        "regex": "c"
+        "regex": "c",
+        "project_config.h": "c",
+        "ledc.h": "c"
     }
 }
