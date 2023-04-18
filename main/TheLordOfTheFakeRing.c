@@ -2,7 +2,6 @@
  * @file TheLordOfTheFakeRing.c
  * @author valentin betbeze (valentin.betbeze@gmail.com)
  * @brief Main code of the game.
- * @version 0.1
  * @date 2023-04-16
  * 
  * @note
@@ -10,6 +9,8 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "rom/ets_sys.h"
 #include "project_config.h"
@@ -18,8 +19,8 @@
 #include "graphics.h"
 
 
-
 spi_device_handle_t tft_handle;
+uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 
 
 void app_main()
@@ -41,23 +42,22 @@ void app_main()
 
     // Initialize LCD display
     init_tft();
-
-    // Fill screen with unicolor
-    uint16_t color = hex_RGB888_to_RGB565(0x0FF0000);
     set_display_area(0, 127, 0, 159);
-    send_command(RAMWR);
-    for (int i = 0; i < (128*160); i++)
-    {           
-        send_word(&color, sizeof(color));
-    }
+    
+    // Set background to black
+    set_background(RGB565(0x000000));
 
     while(1)
     {
-        sleep(1);
+        // Fill background RGB - Example
+        for (int i = 0xFFFFFF; i > 0; i-=0xFF)
+        {
+            set_background(RGB565(i));
+            push_frame();
+            usleep(10*1000);
+        }
     }
 }
-
-
 
 
 

@@ -14,19 +14,9 @@
 
 
 /**
- * @brief 
+ * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
  * 
- * @param red 
- * @param green 
- * @param blue 
- * @return uint16_t 
+ * @param rgb888 24-bit color code
+ * @return The corresponding 16-bit color code
  */
-uint16_t RGB888_to_RGB565(uint8_t red, uint8_t green, uint8_t blue);
-
-/**
- * @brief 
- * 
- * @param rgb888 
- * @return uint16_t 
- */
-uint16_t hex_RGB888_to_RGB565(uint32_t rgb888);
+uint16_t RGB565(uint32_t rgb888);

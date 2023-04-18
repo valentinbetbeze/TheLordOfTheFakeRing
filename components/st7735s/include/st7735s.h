@@ -89,22 +89,26 @@
  * in the main source file (TheLordOfTheFakeRing.c).
  */
 extern spi_device_handle_t tft_handle;
+extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 
+/**
+ * @brief Initialize the ESP32 PWM channel for the control of the 
+ * TFT backlight intensity.
+ */
+void init_pwm_backlight(void);
+
+/**
+ * @brief Set the backlight intensity of the TFT display.
+ * 
+ * @param percent Backlight intensity in percentage.
+ */
+void set_backlight(uint8_t percent);
 
 /**
  * @brief Initialize the spi bus and device interface for the TFT
  * LCD display.
- * @note DMA is disabled on this version. 
  */
 void init_spi(void);
-
-/**
- * @brief Check if the size of the data is valid for SPI transfer.
- * 
- * @param len Amount of data in byte.
- * @return 0 on success, else 1
- */
-int check_data_size(size_t len);
 
 /**
  * @brief Send a command to the ST7735S chip.
@@ -135,19 +139,6 @@ void send_word(uint16_t *data, size_t len);
 void init_tft(void);
 
 /**
- * @brief Initialize the ESP32 PWM channel for the control of the 
- * TFT backlight intensity.
- */
-void init_pwm_backlight(void);
-
-/**
- * @brief Set the backlight intensity of the TFT display.
- * 
- * @param percent Backlight intensity in percentage.
- */
-void set_backlight(uint8_t percent);
-
-/**
  * @brief Set the TFT display area onto which writing data.
  * 
  * @param xs Start column
@@ -160,38 +151,19 @@ void set_backlight(uint8_t percent);
 void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye);
 
 /**
- * @brief Check that the frame size doesn't exceed the ST7735S memory size.
+ * @brief Set the background color of the frame.
  * 
- * @param len Size of the frame in bytes.
- * @return 0 on success, 1 otherwise
+ * @param color Background color
  */
-int check_frame_memory_size(size_t len);
+void set_background(uint16_t color);
 
 /**
- * @brief Legacy function. Send a 1D-array to the ST7735S chip via SPI.
- * Transmits the data by transactions of 64 bytes. 
+ * @brief Send the frame to the ST7735S chip via SPI.
  * 
- * @param frame Pointer to the frame to be displayed. Max LCD_HEIGHT *
- * LCD_WIDTH pixels.
- * @param len Size of the frame in bytes.
- * 
- * @note Prefer the use of push_frame_2d for better transmission speed.
+ * @note Transmits the data by transactions of 64 bytes if DMA is 
+ * disabled, 4092 bytes is enabled.
  */
-void push_frame_1d(uint16_t *frame, int len);
-
-/**
- * @brief Send a 2D-array to the ST7735S chip via SPI. Transmits the data 
- * by transactions of 64 bytes.
- * 
- * @param frame Pointer to the frame to be displayed. Max LCD_HEIGHT * 
- * LCD_WIDTH pixels.
- * @param len Size of the frame in bytes.
- * 
- * @warning The 2D-frame shall have the following format :
- * `uint16_t array[NUM_TRANSACTIONS][PX_PER_TRANSACTION]` - Else the transmission 
- * will fail.
- */
-void push_frame_2d(uint16_t **frame, int len);
+void push_frame(void);
 
 
 #endif // __ST7735S_H__

@@ -1,6 +1,42 @@
 #include "st7735s.h"
 
 
+void init_pwm_backlight(void)
+{
+    // Prepare and then apply the LEDC PWM timer configuration
+    ledc_timer_config_t LCD_timer_config = {
+        .speed_mode             = PWM_LCD_MODE,
+        .duty_resolution        = PWM_LCD_RESOLUTION,
+        .timer_num              = PWM_LCD_CHANNEL,
+        .freq_hz                = PWM_LCD_FREQ,
+        .clk_cfg                = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&LCD_timer_config);
+
+    // Prepare and then apply the LEDC PWM channel configuration
+    ledc_channel_config_t LCD_timer_channel = {
+        .gpio_num               = PIN_LCD_BKL,
+        .speed_mode             = PWM_LCD_MODE,
+        .channel                = PWM_LCD_CHANNEL,
+        .intr_type              = LEDC_INTR_DISABLE,
+        .timer_sel              = PWM_LCD_GROUP,
+        .duty                   = 0,
+        .hpoint                 = 0
+    };
+    ledc_channel_config(&LCD_timer_channel);
+}
+
+
+void set_backlight(uint8_t percent)
+{
+    uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percent / 100;
+    // Set duty cycle
+    ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty);
+    // Update duty to apply the new value
+    ledc_update_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL);
+}
+
+
 void init_spi(void)
 {
     const spi_bus_config_t spi_bus_cfg = {
@@ -27,19 +63,6 @@ void init_spi(void)
 }
 
 
-int check_data_size(size_t len)
-{
-    if (len > MAX_TRANSFER_SIZE)
-    {
-        printf("Error: Data limit reached for SPI transaction.\n    \
-                -----> Max: %i\t bytes\n                             \
-                -----> Cur: %i\t bytes\n", MAX_TRANSFER_SIZE, len);
-        return 1;
-    }
-    return 0;
-}
-
-
 void send_command(uint8_t command)
 {
     spi_transaction_t transaction;
@@ -54,8 +77,6 @@ void send_command(uint8_t command)
 
 void send_byte(uint8_t *data, size_t len)
 {
-    if (check_data_size(len)) return;
-
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.length = 8 * len;
@@ -68,8 +89,6 @@ void send_byte(uint8_t *data, size_t len)
 
 void send_word(uint16_t *data, size_t len)
 {
-    if (check_data_size(len)) return;
-    
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.length = 8 * len;
@@ -149,42 +168,6 @@ void init_tft(void)
 }
 
 
-void init_pwm_backlight(void)
-{
-    // Prepare and then apply the LEDC PWM timer configuration
-    ledc_timer_config_t LCD_timer_config = {
-        .speed_mode             = PWM_LCD_MODE,
-        .duty_resolution        = PWM_LCD_RESOLUTION,
-        .timer_num              = PWM_LCD_CHANNEL,
-        .freq_hz                = PWM_LCD_FREQ,
-        .clk_cfg                = LEDC_AUTO_CLK
-    };
-    ledc_timer_config(&LCD_timer_config);
-
-    // Prepare and then apply the LEDC PWM channel configuration
-    ledc_channel_config_t LCD_timer_channel = {
-        .gpio_num               = PIN_LCD_BKL,
-        .speed_mode             = PWM_LCD_MODE,
-        .channel                = PWM_LCD_CHANNEL,
-        .intr_type              = LEDC_INTR_DISABLE,
-        .timer_sel              = PWM_LCD_GROUP,
-        .duty                   = 0,
-        .hpoint                 = 0
-    };
-    ledc_channel_config(&LCD_timer_channel);
-}
-
-
-void set_backlight(uint8_t percent)
-{
-    uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percent / 100;
-    // Set duty cycle
-    ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty);
-    // Update duty to apply the new value
-    ledc_update_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL);
-}
-
-
 void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye)
 {
     // Set the column
@@ -199,49 +182,23 @@ void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye)
 }
 
 
-int check_frame_memory_size(size_t len)
+void set_background(uint16_t color)
 {
-    if (len > (size_t) ceil((float)LCD_HEIGHT * LCD_WIDTH * 2))
-    {
-        printf("Warning: Frame size exceeds ST7735S memory size.\
-                Data will be lost.\n");
-        return 1;
-    }
-    return 0;
-}
-
-
-void push_frame_1d(uint16_t *frame, int len)
-{
-    check_frame_memory_size(len);
-
-    send_command(RAMWR);
-    uint8_t data[MAX_TRANSFER_SIZE];
     for (int i = 0; i < NUM_TRANSACTIONS; i++)
     {
         for (int j = 0; j < PX_PER_TRANSACTION; j++)
         {
-            data[2*j] = frame[i*PX_PER_TRANSACTION+j] >> 8;
-            data[2*j+1] = frame[i*PX_PER_TRANSACTION+j] & 0xFF;
+            frame[i][j] = color;
         }
-        send_byte(data, MAX_TRANSFER_SIZE);
     }
 }
 
 
-void push_frame_2d(uint16_t **frame, int len)
+void push_frame(void)
 {
-    // Check frame format and memory size
-    if ((int)sizeof(frame)/sizeof(*frame) != NUM_TRANSACTIONS ||
-        check_frame_memory_size(len))
-    {
-        printf("Error: Incorrect frame format\n");
-        return;
-    }
-
     send_command(RAMWR);
     for (int i = 0; i < NUM_TRANSACTIONS; i++)
     {
-        send_word(frame[i], PX_PER_TRANSACTION);
+        send_word(frame[i], MAX_TRANSFER_SIZE);
     }
 }

@@ -67,7 +67,7 @@
 /*************************************************
  * SPI parameters
  ************************************************/
-#define SPI_LCD_FREQUENCY   SPI_MASTER_FREQ_26M
+#define SPI_LCD_FREQUENCY   SPI_MASTER_FREQ_40M
 #define SPI_LCD_FLAGS       SPI_DEVICE_3WIRE
 #define SPI_LCD_QSIZE       1
 #define SPI_LCD_HOST        VSPI_HOST
