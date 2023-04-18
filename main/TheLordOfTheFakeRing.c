@@ -12,10 +12,11 @@
 #include <unistd.h>
 
 #include "rom/ets_sys.h"
+#include "project_config.h"
 #include "joystick.h"
 #include "st7735s.h"
 #include "graphics.h"
-#include "project_config.h"
+
 
 
 spi_device_handle_t tft_handle;
@@ -42,10 +43,11 @@ void app_main()
     init_tft();
 
     // Fill screen with unicolor
-    uint16_t color = hex_RGB888_to_RGB565(0x0000FF);
+    uint16_t color = hex_RGB888_to_RGB565(0x0FF0000);
     set_display_area(0, 127, 0, 159);
+    send_command(RAMWR);
     for (int i = 0; i < (128*160); i++)
-    {
+    {           
         send_word(&color, sizeof(color));
     }
 

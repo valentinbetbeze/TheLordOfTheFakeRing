@@ -14,6 +14,8 @@
         "string_view": "c",
         "regex": "c",
         "project_config.h": "c",
-        "ledc.h": "c"
+        "ledc.h": "c",
+        "array": "c",
+        "string": "c"
     }
 }

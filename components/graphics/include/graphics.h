@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "driver/spi_common.h"
+
 /*************************************************
  * Some color codes (RGB565)
  ************************************************/

@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "project_config.h"
 #include "driver/spi_master.h"
 #include "driver/ledc.h"
 #include "esp_err.h"
@@ -159,22 +160,38 @@ void set_backlight(uint8_t percent);
 void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye);
 
 /**
- * @brief Check that the frame size doesn't exceed the ST7725S memory size.
+ * @brief Check that the frame size doesn't exceed the ST7735S memory size.
  * 
  * @param len Size of the frame in bytes.
- * @return 0 on success, else 1
+ * @return 0 on success, 1 otherwise
  */
-int check_frame_size(int len);
+int check_frame_memory_size(size_t len);
 
 /**
- * @brief Send a frame to the ST7735S chip via SPI. Transmits the data 
+ * @brief Legacy function. Send a 1D-array to the ST7735S chip via SPI.
+ * Transmits the data by transactions of 64 bytes. 
+ * 
+ * @param frame Pointer to the frame to be displayed. Max LCD_HEIGHT *
+ * LCD_WIDTH pixels.
+ * @param len Size of the frame in bytes.
+ * 
+ * @note Prefer the use of push_frame_2d for better transmission speed.
+ */
+void push_frame_1d(uint16_t *frame, int len);
+
+/**
+ * @brief Send a 2D-array to the ST7735S chip via SPI. Transmits the data 
  * by transactions of 64 bytes.
  * 
  * @param frame Pointer to the frame to be displayed. Max LCD_HEIGHT * 
  * LCD_WIDTH pixels.
  * @param len Size of the frame in bytes.
+ * 
+ * @warning The 2D-frame shall have the following format :
+ * `uint16_t array[NUM_TRANSACTIONS][PX_PER_TRANSACTION]` - Else the transmission 
+ * will fail.
  */
-void push_frame(uint16_t **frame, int len);
-//void push_frame(uint16_t *frame, int len);
+void push_frame_2d(uint16_t **frame, int len);
+
 
 #endif // __ST7735S_H__

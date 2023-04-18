@@ -38,7 +38,7 @@
 #define LCD_FPA             0x06
 #define LCD_BPA             0x03
 #define LCD_MH              0x00
-#define LCD_RGB             0x00
+#define LCD_RGB             0x00            /* 0x00: RGB; 0x01: BGR     */
 #define LCD_ML              0x00
 #define LCD_MV              0x00
 #define LCD_MX              0x00
@@ -68,7 +68,7 @@
  * SPI parameters
  ************************************************/
 #define SPI_LCD_FREQUENCY   SPI_MASTER_FREQ_26M
-#define SPI_LCD_FLAGS       SPI_DEVICE_3WIRE | SPI_DEVICE_HALFDUPLEX
+#define SPI_LCD_FLAGS       SPI_DEVICE_3WIRE
 #define SPI_LCD_QSIZE       1
 #define SPI_LCD_HOST        VSPI_HOST
 #define SPI_LCD_MODE        (0)

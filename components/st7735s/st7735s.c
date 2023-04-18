@@ -1,5 +1,4 @@
 #include "st7735s.h"
-#include "project_config.h"
 
 
 void init_spi(void)
@@ -70,10 +69,10 @@ void send_byte(uint8_t *data, size_t len)
 void send_word(uint16_t *data, size_t len)
 {
     if (check_data_size(len)) return;
-
+    
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
-    transaction.length = 16 * len;
+    transaction.length = 8 * len;
     transaction.tx_buffer = data;
     
     gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
@@ -110,8 +109,8 @@ void init_tft(void)
 
     // Memory data access control
     send_command(MADCTL);
-    parameter = ((LCD_MY << 8) | (LCD_MX << 7) | (LCD_MV << 6) |
-                (LCD_ML << 5) | (LCD_RGB << 4) | (LCD_MH << 3));
+    parameter = ((LCD_MY << 7) | (LCD_MX << 6) | (LCD_MV << 5) |
+                (LCD_ML << 4) | (LCD_RGB << 3) | (LCD_MH << 2));
     send_byte(&parameter, sizeof(parameter));
 
     // Display inversion off
@@ -200,26 +199,9 @@ void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye)
 }
 
 
-int check_frame_size(int len)
+int check_frame_memory_size(size_t len)
 {
-    uint8_t bits_per_pixel;
-    switch (LCD_COLOR_FORMAT)
-    {
-        case 0x03: // Adress for 12-bit per pixel
-            bits_per_pixel = 12;
-            break;
-        case 0x05: // Adress for 16-bit per pixel
-            bits_per_pixel = 16;
-            break;
-        case 0x06: // Adress for 18-bit per pixel
-            bits_per_pixel = 18;
-            break;
-        default:
-            printf("Error: COLMOD (0x3A) not set\n");
-            return 1;
-    }
-    int num_max_bytes = ceil((float)LCD_HEIGHT * LCD_WIDTH * bits_per_pixel / 8);
-    if (len > num_max_bytes)
+    if (len > (size_t) ceil((float)LCD_HEIGHT * LCD_WIDTH * 2))
     {
         printf("Warning: Frame size exceeds ST7735S memory size.\
                 Data will be lost.\n");
@@ -229,34 +211,37 @@ int check_frame_size(int len)
 }
 
 
-void push_frame(uint16_t **frame, int len)
+void push_frame_1d(uint16_t *frame, int len)
 {
+    check_frame_memory_size(len);
+
     send_command(RAMWR);
+    uint8_t data[MAX_TRANSFER_SIZE];
     for (int i = 0; i < NUM_TRANSACTIONS; i++)
     {
-        send_word(frame[i], sizeof(frame[i]));
+        for (int j = 0; j < PX_PER_TRANSACTION; j++)
+        {
+            data[2*j] = frame[i*PX_PER_TRANSACTION+j] >> 8;
+            data[2*j+1] = frame[i*PX_PER_TRANSACTION+j] & 0xFF;
+        }
+        send_byte(data, MAX_TRANSFER_SIZE);
     }
 }
 
-/*
-    void push_frame(uint16_t *frame, int len)
-    {
-        check_frame_size(len);
 
-         
-        uint16_t num_transactions = ceil((float)len / MAX_TRANSFER_SIZE);
-         
-        uint8_t data[MAX_TRANSFER_SIZE];
-        uint16_t px_per_trans = MAX_TRANSFER_SIZE / 2;
-        send_command(RAMWR);
-        for (int i = 0; i < NUM_TRANSACTIONS; i++)
-        {
-            for (int j = 0; j < px_per_trans; j++)
-            {
-                data[2*j] = frame[i*px_per_trans+j] >> 8;
-                data[2*j+1] = frame[i*px_per_trans+j] & 0xFF;
-            }
-            send_data(data, MAX_TRANSFER_SIZE);
-        }
+void push_frame_2d(uint16_t **frame, int len)
+{
+    // Check frame format and memory size
+    if ((int)sizeof(frame)/sizeof(*frame) != NUM_TRANSACTIONS ||
+        check_frame_memory_size(len))
+    {
+        printf("Error: Incorrect frame format\n");
+        return;
     }
-*/
+
+    send_command(RAMWR);
+    for (int i = 0; i < NUM_TRANSACTIONS; i++)
+    {
+        send_word(frame[i], PX_PER_TRANSACTION);
+    }
+}

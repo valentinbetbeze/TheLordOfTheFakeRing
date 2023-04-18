@@ -1,5 +1,5 @@
 set(LIB
-    
+    driver
 )
 
 idf_component_register(
