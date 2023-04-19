@@ -15,9 +15,11 @@
 #ifndef __PROJECT_CONFIG_H__
 #define __PROJECT_CONFIG_H__
 
+
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "driver/ledc.h"
+
 
 /*************************************************
  * GPIOs
@@ -28,6 +30,7 @@
 #define PIN_LCD_RES         GPIO_NUM_2      /* Reset                    */
 #define PIN_LCD_DC          GPIO_NUM_15     /* Register Selection       */
 #define PIN_LCD_BKL         GPIO_NUM_16     /* Background light         */
+
 
 /*************************************************
  * Display parameters
@@ -64,6 +67,7 @@
     #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
 #endif
 
+
 /*************************************************
  * SPI parameters
  ************************************************/
@@ -80,26 +84,26 @@
 // Maximum amount of bytes that can be sent in a single SPI transaction.
     #define MAX_TRANSFER_SIZE       (4092)
     #if (LCD_MEMORY_BASE == 0b00)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (11)
     #elif (LCD_MEMORY_BASE == 0b01)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (9)
     #elif (LCD_MEMORY_BASE == 0b11)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (11)
     #endif
 #else
 // Maximum amount of bytes that can be sent in a single SPI transaction.
     #define MAX_TRANSFER_SIZE       (64)
     #if (LCD_MEMORY_BASE == 0b00)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (669)
     #elif (LCD_MEMORY_BASE == 0b01)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (545)
     #elif (LCD_MEMORY_BASE == 0b11)
-// Number of transactions required to send the frame to the display.
+// Number of SPI transactions required to send the frame to the display.
         #define NUM_TRANSACTIONS    (640)
     #endif
 #endif

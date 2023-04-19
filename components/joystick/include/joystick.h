@@ -1,5 +1,14 @@
+/**
+ * @file joystick.h
+ * @author valentin betbeze (valentin.betbeze@gmail.com)
+ * @brief 
+ * @date 2023-04-10
+ * 
+ */
+
 #ifndef __JOYSTICK_H__
 #define __JOYSTICK_H__
+
 
 #include <stdint.h>
 
@@ -8,6 +17,10 @@
 #include "esp_timer.h"
 #include "esp_err.h"
 
+
+/*************************************************
+ * GPIOs and Constants
+ *************************************************/
 #define PIN_BTN_A		GPIO_NUM_18
 #define PIN_BTN_B       GPIO_NUM_5
 #define PIN_BTN_C       GPIO_NUM_19
@@ -23,11 +36,14 @@
 #define JOY_MAX_N       4095            /*!< Maximum ADC raw value for all axes         */
 
 
+/*************************************************
+ * Data structures
+ *************************************************/
+
 /**
  * @brief Button state flags
  */
-typedef struct
-{
+typedef struct {
     gpio_num_t gpio_num;            /*!< GPIO number                                    */
     uint8_t previous_state;         /*!< Button state before the last polling           */
     uint8_t current_state;          /*!< Button state after the last polling            */
@@ -41,8 +57,7 @@ typedef struct
  * Hence the left @p `l_` and right @p `r_` parameters, each representing one side of 
  * the resistive track.
  */
-typedef struct
-{
+typedef struct {
     uint16_t idle_value;            /*!< ADC raw value while the axis is idle           */
     float l_slope;                  /*!< Linear function slope - left side              */
     float r_slope;                  /*!< Linear function slope - right side             */
@@ -54,12 +69,15 @@ typedef struct
 /**
  * @brief Joystick axis object
  */
-typedef struct
-{
+typedef struct {
     axis_t axis_x;
     axis_t axis_y;
 } joystick_t;
 
+
+/*************************************************
+ * Prototypes
+ *************************************************/
 
 /**
  * @brief Initialize a button

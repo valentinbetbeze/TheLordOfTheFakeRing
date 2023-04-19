@@ -1,4 +1,4 @@
-#include "st7735s.h"
+#include "st7735s_hal.h"
 
 
 void init_pwm_backlight(void)
@@ -182,23 +182,10 @@ void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye)
 }
 
 
-void set_background(uint16_t color)
-{
-    for (int i = 0; i < NUM_TRANSACTIONS; i++)
-    {
-        for (int j = 0; j < PX_PER_TRANSACTION; j++)
-        {
-            frame[i][j] = color;
-        }
-    }
-}
-
-
 void push_frame(void)
 {
     send_command(RAMWR);
-    for (int i = 0; i < NUM_TRANSACTIONS; i++)
-    {
+    for (int i = 0; i < NUM_TRANSACTIONS; i++) {
         send_word(frame[i], MAX_TRANSFER_SIZE);
     }
 }

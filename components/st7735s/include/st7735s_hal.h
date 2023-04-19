@@ -1,14 +1,16 @@
 /**
- * @file st7735s.h
+ * @file st7735s_hal.h
  * @author valentin betbeze (valentin.betbeze@gmail.com)
- * @brief Header file of the ST7735S driver for the ESP32-WROOM-32
+ * @brief Header file for the HAL functions of the ST7735S driver.
+ * Compatible for use with: ESP32-WROOM-32.
  * @date 2023-04-16
  * 
  * @warning Do not modify any value between parenthesis '()'.
  */
 
-#ifndef __ST7735S_H__
-#define __ST7735S_H__
+#ifndef __ST7735S_HAL_H__
+#define __ST7735S_HAL_H__
+
 
 #include <stdio.h>
 #include <stdint.h>
@@ -20,6 +22,7 @@
 #include "driver/ledc.h"
 #include "esp_err.h"
 #include "rom/ets_sys.h"
+
 
 /*************************************************
  * ST7735S functions (System/Panel)
@@ -82,14 +85,16 @@
 #define GCV                 (0xFC)          /*  */
 
 
-/**
- * @brief TFT display handle on the SPI bus
- * @note Set as global variable to avoid having to pass it as an 
- * arguments every time an SPI communication takes place. Declared
- * in the main source file (TheLordOfTheFakeRing.c).
- */
+/*************************************************
+ * Extern variables
+ *************************************************/
 extern spi_device_handle_t tft_handle;
 extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
+
+
+/*************************************************
+ * Prototypes
+ *************************************************/
 
 /**
  * @brief Initialize the ESP32 PWM channel for the control of the 
@@ -151,13 +156,6 @@ void init_tft(void);
 void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye);
 
 /**
- * @brief Set the background color of the frame.
- * 
- * @param color Background color
- */
-void set_background(uint16_t color);
-
-/**
  * @brief Send the frame to the ST7735S chip via SPI.
  * 
  * @note Transmits the data by transactions of 64 bytes if DMA is 
@@ -166,4 +164,4 @@ void set_background(uint16_t color);
 void push_frame(void);
 
 
-#endif // __ST7735S_H__
+#endif // __ST7735S_HAL_H__

@@ -12,26 +12,28 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "rom/ets_sys.h"
 #include "project_config.h"
 #include "joystick.h"
-#include "st7735s.h"
-#include "graphics.h"
+#include "st7735s_hal.h"
+#include "st7735s_graphics.h"
+#include "rom/ets_sys.h"
 
-
+/**
+ * @brief TFT display handle on the SPI bus
+ * @note Set as global variable to avoid having to pass it as an 
+ * arguments every time an SPI communication takes place.
+ */
 spi_device_handle_t tft_handle;
+
+/**
+ * @brief 
+ * 
+ */
 uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 
 
 void app_main()
 {
-    // Initialize SPI bus
-    init_spi();
-
-    // Set display backlight
-    init_pwm_backlight();
-    set_backlight(30);
-    
     // Initialize non-SPI GPIOs
     const gpio_config_t io_conf = {
         .pin_bit_mask = ((1 << PIN_LCD_DC) | (1 << PIN_LCD_RES)),
@@ -40,19 +42,24 @@ void app_main()
     };
     gpio_config(&io_conf);
 
+    // Initialize SPI bus
+    init_spi();
+
     // Initialize LCD display
     init_tft();
     set_display_area(0, 127, 0, 159);
+
+    // Set display backlight
+    init_pwm_backlight();
+    set_backlight(30);
     
     // Set background to black
-    set_background(RGB565(0x000000));
+    fill_background(RGB565(0x000000));
 
-    while(1)
-    {
+    while(1) {
         // Fill background RGB - Example
-        for (int i = 0xFFFFFF; i > 0; i-=0xFF)
-        {
-            set_background(RGB565(i));
+        for (int i = 0xFFFFFF; i > 0; i-=0xFF) {
+            fill_background(RGB565(i));
             push_frame();
             usleep(10*1000);
         }
@@ -79,8 +86,7 @@ void app_main(void)
     adc_oneshot_unit_handle_t adc_handle;
     init_joystick(&adc_handle, &joystick);
 
-    while (1)
-    {
+    while (1) {
         ets_delay_us(10*1000);
 
         // Poll buttons

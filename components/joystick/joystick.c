@@ -10,23 +10,26 @@ void init_button(button_t *btn, gpio_num_t gpio_num)
     gpio_set_intr_type(btn->gpio_num, GPIO_INTR_DISABLE);
 }
 
+
 uint8_t poll_button(button_t *btn)
 {
     btn->current_state = (uint8_t) gpio_get_level(btn->gpio_num);
-    if (btn->current_state != btn->previous_state)
-    {
+    if (btn->current_state != btn->previous_state) {
         // Update previous state
         btn->previous_state = btn->current_state;
         // If the current state is low (e.g. pushed down)
-        if (!btn->current_state) return 1;
+        if (!btn->current_state) {
+            return 1;
+        }
     }
     return 0;
 }
 
+
 joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
 {
     joystick_t joystick;
-    const uint8_t y_scale = 100;        /*!< So that JOY_MAX_N = 100%                   */
+    const uint8_t y_scale = 100;        /*!< So that JOY_MAX_N = 100% */
 
     // x-axis configuration
     joystick.axis_x.idle_value = idle_val_x;
@@ -44,6 +47,7 @@ joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
 
     return joystick;
 }
+
 
 void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick)
 {
@@ -69,6 +73,7 @@ void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick)
     adc_oneshot_config_channel(*handle, joystick->axis_y.channel, &chan_cfg);
 }
 
+
 int8_t read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis)
 {
     int8_t value = 0;
@@ -76,13 +81,11 @@ int8_t read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis)
     adc_oneshot_read(handle, axis.channel, &raw_value);
 
     // Left side of the resistive track
-    if (raw_value < axis.idle_value)
-    {
+    if (raw_value < axis.idle_value) {
         value = axis.l_slope * raw_value + axis.l_offset;
     }
     // Right side of the resistive track
-    else if (raw_value > axis.idle_value)
-    {
+    else if (raw_value > axis.idle_value) {
         value = axis.r_slope * raw_value + axis.r_offset;
     }
     else value = 0;

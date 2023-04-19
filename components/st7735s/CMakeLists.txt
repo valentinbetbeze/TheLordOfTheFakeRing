@@ -1,3 +1,8 @@
+set (SOURCES
+    "st7735s_hal.c"
+    "st7735s_graphics.c"
+)
+
 set(LIB
     driver
     esp_rom
@@ -6,7 +11,7 @@ set(LIB
 )
 
 idf_component_register(
-                        SRCS "st7735s.c"
+                        SRCS ${SOURCES}
                         INCLUDE_DIRS "include"
                         REQUIRES ${LIB}
 )
