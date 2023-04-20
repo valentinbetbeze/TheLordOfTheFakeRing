@@ -54,15 +54,61 @@ void app_main()
     set_backlight(30);
     
     // Set background to black
-    fill_background(RGB565(0x000000));
+    fill_background(rgb565(0x000000));
+
+    /*
+    // Show a 10x10 square on the top left of the display
+    rectangle_t rectangle1 = {
+        .color      = 0xFFFF,
+        .height     = 10,
+        .width      = 10,
+        .pos_x      = 0,
+        .pos_y      = 0
+    };
+    draw_rectangle(rectangle1);
+    rectangle_t rectangle2 = {
+        .color      = SPI_SWAP_DATA_TX(0x001F, 16),
+        .height     = 10,
+        .width      = 10,
+        .pos_x      = 0,
+        .pos_y      = 15
+    };
+    draw_rectangle(rectangle2);
+    
+    circle_t circle = {
+        .color      = 0xFFFF,
+        .radius     = 10,
+        .thickness  = 5,
+        .pos_x      = LCD_WIDTH / 2,
+        .pos_y      = LCD_HEIGHT / 2
+    };
+    //draw_circle(circle);
+    */
+    
+    uint8_t string1[] = "YO LUCA,";
+    text_t text1 = {
+        .color      = 0xFFFF,
+        .data       = string1,
+        .size       = sizeof(string1),
+        .pos_x      = 0,
+        .pos_y      = 0,
+    };
+    draw_text(text1);
+
+    uint8_t string2[] = "LA FORME ? :D";
+    text_t text2 = {
+        .color      = 0xFFFF,
+        .data       = string2,
+        .size       = sizeof(string2),
+        .pos_x      = 0,
+        .pos_y      = 8,
+    };
+    draw_text(text2);
+
+    push_frame();
 
     while(1) {
-        // Fill background RGB - Example
-        for (int i = 0xFFFFFF; i > 0; i-=0xFF) {
-            fill_background(RGB565(i));
-            push_frame();
-            usleep(10*1000);
-        }
+        usleep(10*1000);
     }
 }
 

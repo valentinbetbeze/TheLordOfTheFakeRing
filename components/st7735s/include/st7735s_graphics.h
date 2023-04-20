@@ -18,7 +18,7 @@
 
 #include "driver/spi_common.h"
 #include "project_config.h"
-#include "st7735s_fonts.h"
+#include "fonts.h"
 
 
 /*************************************************
@@ -53,10 +53,10 @@ typedef enum {
  * 
  */
 typedef struct {
-    uint8_t pos_x;          /* top-left x-position  */
-    uint8_t pos_y;          /* top-left y-position  */
-    uint8_t height;         /* in pixels            */
-    uint8_t width;          /* in pixels            */
+    uint8_t pos_x;          /* Top-left x-position  */
+    uint8_t pos_y;          /* Top-left y-position  */
+    uint8_t height;         /* Width in pixels      */
+    uint8_t width;          /* Width in pixels      */
     uint16_t color;         /* 16-bit format        */
 } rectangle_t;
 
@@ -65,10 +65,10 @@ typedef struct {
  * 
  */
 typedef struct {
-    uint8_t pos_x;          /* center x-position    */
-    uint8_t pos_y;          /* center y-position    */
-    uint8_t radius;         /* in pixels            */
-    uint8_t thickness;      /* in pixels            */
+    uint8_t pos_x;          /* Center x-position    */
+    uint8_t pos_y;          /* Center y-position    */
+    uint8_t radius;         /* Radius in pixels     */
+    uint8_t thickness;      /* Thinkness in pixels  */
     uint16_t color;         /* 16-bit format        */
 } circle_t;
 
@@ -77,11 +77,11 @@ typedef struct {
  * 
  */
 typedef struct {
-    uint8_t pos_x;
-    uint8_t pos_y;
+    uint8_t pos_x;          /* Top-left x-position  */
+    uint8_t pos_y;          /* Top-left y-position  */
     uint16_t color;         /* 16-bit format        */
-    uint8_t size;           /* in bytes             */
-    uint8_t *data;          /* ptr to char array    */
+    uint8_t size;           /* Text size in bytes   */
+    uint8_t *data;          /* Ptr to char array    */
 } text_t;
 
 /**
@@ -89,10 +89,10 @@ typedef struct {
  * 
  */
 typedef struct {
-    uint8_t pos_x;          /* top-left x-position  */
-    uint8_t pos_y;          /* top-left y-position  */
-    uint8_t size;           /* in bytes             */
-    uint16_t *data;         /* ptr to sprite data   */
+    uint8_t pos_x;          /* Top-left x-position  */
+    uint8_t pos_y;          /* Top-left y-position  */
+    uint8_t size;           /* Sprite size in bytes */
+    uint16_t *data;         /* Ptr to sprite data   */
 } sprite_t;
 
 /**
@@ -120,10 +120,9 @@ typedef struct {
  * 
  * @param x 
  * @param y 
- * @param row 
- * @param column 
+ * @param data
  */
-void get_frame_indexes(uint8_t x, uint8_t y, uint16_t *row, uint16_t *column);
+void write_to_frame(uint8_t x, uint8_t y, uint16_t data);
 
 /**
  * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
@@ -131,7 +130,7 @@ void get_frame_indexes(uint8_t x, uint8_t y, uint16_t *row, uint16_t *column);
  * @param rgb888 24-bit color code
  * @return The corresponding 16-bit color code
  */
-uint16_t RGB565(uint32_t rgb888);
+uint16_t rgb565(uint32_t rgb888);
 
 /**
  * @brief Fill the background color of the frame.

@@ -1,14 +1,9 @@
 set (SOURCES
-    "st7735s_hal.c"
-    "st7735s_graphics.c"
+    "fonts.c"
 )
 
 set(LIB
-    driver
-    esp_rom
-    esp_common
-    project_config
-    assets
+    
 )
 
 idf_component_register(

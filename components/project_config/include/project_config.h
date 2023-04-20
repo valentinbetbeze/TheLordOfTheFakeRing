@@ -44,8 +44,8 @@
 #define LCD_RGB             0x00            /* 0x00: RGB; 0x01: BGR     */
 #define LCD_ML              0x00
 #define LCD_MV              0x00
-#define LCD_MX              0x00
-#define LCD_MY              0x00
+#define LCD_MX              0x00            /* X-Mirror                 */
+#define LCD_MY              0x01            /* Y-Mirror                 */
 #define LCD_GAMMA           0x01            /* Gamma Curve 0            */
 
 #define PWM_LCD_GROUP       LEDC_TIMER_0
@@ -55,14 +55,14 @@
 #define PWM_LCD_RESOLUTION  LEDC_TIMER_4_BIT
 
 #if (LCD_MEMORY_BASE == 0b00)
-    #define LCD_HEIGHT      (162)           /* pixels                   */
-    #define LCD_WIDTH       (132)           /* pixels                   */
+    #define LCD_HEIGHT      (132)           /* pixels                   */
+    #define LCD_WIDTH       (162)           /* pixels                   */
 #elif (LCD_MEMORY_BASE == 0b01)
     #define LCD_HEIGHT      (132)           /* pixels                   */
     #define LCD_WIDTH       (132)           /* pixels                   */
 #elif (LCD_MEMORY_BASE == 0b11)
-    #define LCD_HEIGHT      (160)           /* pixels                   */
-    #define LCD_WIDTH       (128)           /* pixels                   */
+    #define LCD_HEIGHT      (128)           /* pixels                   */
+    #define LCD_WIDTH       (160)           /* pixels                   */
 #else
     #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
 #endif

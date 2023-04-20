@@ -17,6 +17,14 @@
         "string": "c",
         "st7735s_graphics.h": "c",
         "st7735s_hal.h": "c",
-        "st7735s_fonts.h": "c"
+        "st7735s_fonts.h": "c",
+        "bit": "c",
+        "compare": "c",
+        "cstddef": "c",
+        "limits": "c",
+        "memory": "c",
+        "new": "c",
+        "functional": "c",
+        "fonts.h": "c"
     }
 }

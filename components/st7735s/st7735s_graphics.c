@@ -1,24 +1,32 @@
 #include "st7735s_graphics.h"
 
 
-void get_frame_indexes(uint8_t x, uint8_t y, uint16_t *row, uint16_t *column)
+void write_to_frame(uint8_t x, uint8_t y, uint16_t data)
 {
-    uint16_t npixel = LCD_WIDTH * x + (y + 1);
+    uint16_t row, column;
+    uint16_t npixel = LCD_HEIGHT * x + (y + 1);
     uint16_t quotient = (uint16_t) npixel / PX_PER_TRANSACTION;
     uint16_t remainder = (uint16_t) npixel % PX_PER_TRANSACTION;
 
     if (remainder) {
-        *row = quotient;
-        *column = remainder - 1;
+        row = quotient;
+        column = remainder - 1;
     }
     else {
-        *row = quotient - 1;
-        *column = PX_PER_TRANSACTION - 1;
+        row = quotient - 1;
+        column = PX_PER_TRANSACTION - 1;
     }
+
+    // Do not *try* to write if out of frame
+    if ((NUM_TRANSACTIONS <= row) || (PX_PER_TRANSACTION <= column)) {
+        return;
+    }
+
+    frame[row][column] = data;
 }
 
 
-uint16_t RGB565(uint32_t rgb888)
+uint16_t rgb565(uint32_t rgb888)
 {
     // Convert each color in the new format
     uint8_t red = (uint8_t) (((rgb888 >> 16) * 31) / 255);
@@ -45,11 +53,9 @@ void fill_background(uint16_t color)
 
 void draw_rectangle(rectangle_t rectangle)
 {
-    uint16_t row, column;
     for (int x = rectangle.pos_x; x < (rectangle.pos_x + rectangle.width); x++) {
         for (int y = rectangle.pos_y; y < (rectangle.pos_y + rectangle.height); y++) {
-            get_frame_indexes(x, y, &row, &column);
-            frame[row][column] = rectangle.color;
+            write_to_frame(x, y, rectangle.color);
         }
     }
 }
@@ -58,7 +64,6 @@ void draw_rectangle(rectangle_t rectangle)
 void draw_circle(circle_t circle)
 {
     uint8_t y_limit;
-    uint16_t row, column;
     // Leveraging symmetry to lower the number of iterations
     for (int x = circle.pos_x; x < (circle.pos_x + circle.radius); x++) {
         uint8_t delta_y = (uint8_t) sqrt(pow(circle.radius, 2) - pow(x - circle.pos_x, 2));
@@ -71,11 +76,9 @@ void draw_circle(circle_t circle)
         } 
         for (uint8_t y = (circle.pos_y - delta_y); y < y_limit; y++) {
             // Top-right quarter
-            get_frame_indexes(x, y, &row, &column);
-            frame[row][column] = circle.color;
+            write_to_frame(x, y, circle.color);
             // Top-left quarter
-            get_frame_indexes(x-2*(x-circle.pos_x), y, &row, &column);
-            frame[row][column] = circle.color;
+            write_to_frame(x-2*(x-circle.pos_x), y, circle.color);
         }
         // Bottom-half of the circle
         if (circle.thickness) {
@@ -86,11 +89,9 @@ void draw_circle(circle_t circle)
         }   
         for (uint8_t y = (circle.pos_y + delta_y); y > y_limit; y--) {
             // Bottom-right quarter
-            get_frame_indexes(x, y, &row, &column);
-            frame[row][column] = circle.color;
+            write_to_frame(x, y, circle.color);
             // Bottom-left quarter
-            get_frame_indexes(x-2*(x-circle.pos_x), y, &row, &column);
-            frame[row][column] = circle.color;
+            write_to_frame(x-2*(x-circle.pos_x), y, circle.color);
         }
     }
 }
@@ -98,7 +99,33 @@ void draw_circle(circle_t circle)
 
 void draw_text(text_t text)
 {
-    
+    const uint8_t MSB = FONT_SIZE - 1;
+    uint8_t px_pos_x, px_pos_y;
+
+    for (int text_index = 0; text_index < text.size; text_index++) {
+
+        if ((text.data[text_index] < FIRST_ASCII) || (LAST_ASCII < text.data[text_index])) {
+            if (text.data[text_index]) {
+                printf("Error: `%c`(0x%x) has no font sprite.\n",
+                        text.data[text_index], text.data[text_index]);
+            }
+            break;
+        }
+        uint8_t char_index = text.data[text_index]-FIRST_ASCII;
+        /** Using the character ascii code (ex:65 for 'A'), get the corresponding
+         * letter sprite and iterate through each layer of the sprite */
+        for (int layer_index = 0; layer_index < FONT_SIZE; layer_index++) {
+            uint8_t layer = myFont[char_index][layer_index];
+            px_pos_y = text.pos_y + layer_index;
+            // Extract each bit from bit field and write the pixel to the frame
+            for (int bit = MSB; bit >= 0; bit--) {
+                if ((layer >> bit) & 1) {
+                    px_pos_x = text.pos_x + text_index*(FONT_SIZE+FONT_PADDING) + (MSB-bit);
+                    write_to_frame(px_pos_x, px_pos_y, text.color);
+                }
+            }
+        }
+    }
 }
 
 
