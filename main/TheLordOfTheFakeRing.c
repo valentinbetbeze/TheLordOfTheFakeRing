@@ -49,61 +49,39 @@ void app_main()
     init_tft();
     set_display_area(0, 127, 0, 159);
 
+    // Set background
+    fill_background(BLACK);
+
     // Set display backlight
     init_pwm_backlight();
     set_backlight(30);
     
-    // Set background to black
-    fill_background(rgb565(0x000000));
-
-    /*
-    // Show a 10x10 square on the top left of the display
-    rectangle_t rectangle1 = {
-        .color      = 0xFFFF,
-        .height     = 10,
-        .width      = 10,
-        .pos_x      = 0,
-        .pos_y      = 0
-    };
-    draw_rectangle(rectangle1);
-    rectangle_t rectangle2 = {
-        .color      = SPI_SWAP_DATA_TX(0x001F, 16),
-        .height     = 10,
-        .width      = 10,
-        .pos_x      = 0,
-        .pos_y      = 15
-    };
-    draw_rectangle(rectangle2);
-    
-    circle_t circle = {
-        .color      = 0xFFFF,
-        .radius     = 10,
-        .thickness  = 5,
-        .pos_x      = LCD_WIDTH / 2,
-        .pos_y      = LCD_HEIGHT / 2
-    };
-    //draw_circle(circle);
-    */
-    
-    uint8_t string1[] = "YO LUCA,";
+    uint8_t string1[] = "THE LORD OF\nTHE FAKE RING\nAWAITS...";
     text_t text1 = {
-        .color      = 0xFFFF,
+        .color      = GREEN,
         .data       = string1,
         .size       = sizeof(string1),
-        .pos_x      = 0,
-        .pos_y      = 0,
+        .pos_x      = 10,
+        .pos_y      = 80,
     };
-    draw_text(text1);
+    //draw_text(text1);
 
-    uint8_t string2[] = "LA FORME ? :D";
-    text_t text2 = {
-        .color      = 0xFFFF,
-        .data       = string2,
-        .size       = sizeof(string2),
-        .pos_x      = 0,
-        .pos_y      = 8,
+    circle_t circle = {
+        .color      = WHITE,
+        .pos_x      = LCD_WIDTH / 4,
+        .pos_y      = LCD_HEIGHT / 2,
+        .radius     = 30,
+        .thickness  = 1,
     };
-    draw_text(text2);
+    draw_circle(circle);
+    circle_t circle2 = {
+        .color      = SPI_SWAP_DATA_TX(0xFFDF, 16),
+        .pos_x      = 3 * LCD_WIDTH / 4,
+        .pos_y      = LCD_HEIGHT / 2,
+        .radius     = 30,
+        .thickness  = 5,
+    };
+    draw_circle(circle2);
 
     push_frame();
 

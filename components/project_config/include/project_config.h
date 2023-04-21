@@ -48,12 +48,6 @@
 #define LCD_MY              0x01            /* Y-Mirror                 */
 #define LCD_GAMMA           0x01            /* Gamma Curve 0            */
 
-#define PWM_LCD_GROUP       LEDC_TIMER_0
-#define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
-#define PWM_LCD_MODE        LEDC_LOW_SPEED_MODE
-#define PWM_LCD_FREQ        5000
-#define PWM_LCD_RESOLUTION  LEDC_TIMER_4_BIT
-
 #if (LCD_MEMORY_BASE == 0b00)
     #define LCD_HEIGHT      (132)           /* pixels                   */
     #define LCD_WIDTH       (162)           /* pixels                   */
@@ -66,6 +60,15 @@
 #else
     #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
 #endif
+
+#define PWM_LCD_GROUP       LEDC_TIMER_0
+#define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
+#define PWM_LCD_MODE        LEDC_LOW_SPEED_MODE
+#define PWM_LCD_FREQ        5000
+#define PWM_LCD_RESOLUTION  LEDC_TIMER_4_BIT
+
+#define TEXT_PADDING_X      1               /* pixels                   */
+#define TEXT_PADDING_Y      3               /* pixels                   */
 
 
 /*************************************************

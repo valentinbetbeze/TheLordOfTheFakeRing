@@ -22,13 +22,14 @@
 
 
 /*************************************************
- * Some color codes (RGB565)
+ * Color codes (RGB565)
  ************************************************/
-#define RED                 (0xF800)
-#define GREEN               (0x07E0)
-#define BLUE                (0x001F)
-#define WHITE               (0xFFFF)
-#define BLACK               (0x0000)
+#define RED                 (SPI_SWAP_DATA_TX(0xF800, 16))
+#define GREEN               (SPI_SWAP_DATA_TX(0x07E0, 16))
+#define BLUE                (SPI_SWAP_DATA_TX(0x001F, 16))
+#define WHITE               (SPI_SWAP_DATA_TX(0xFFDF, 16))
+#define BLACK               (SPI_SWAP_DATA_TX(0x0000, 16))
+#define TRANSPARENT         (0xFFFF) /* Full white = transparency */
 
 
 /*************************************************
@@ -91,7 +92,8 @@ typedef struct {
 typedef struct {
     uint8_t pos_x;          /* Top-left x-position  */
     uint8_t pos_y;          /* Top-left y-position  */
-    uint8_t size;           /* Sprite size in bytes */
+    uint8_t height;         /* Width in pixels      */
+    uint8_t width;          /* Width in pixels      */
     uint16_t *data;         /* Ptr to sprite data   */
 } sprite_t;
 
@@ -122,7 +124,7 @@ typedef struct {
  * @param y 
  * @param data
  */
-void write_to_frame(uint8_t x, uint8_t y, uint16_t data);
+void write_to_frame(int16_t x, int16_t y, uint16_t data);
 
 /**
  * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
@@ -145,6 +147,17 @@ void fill_background(uint16_t color);
  * @param rectangle 
  */
 void draw_rectangle(rectangle_t rectangle);
+
+/**
+ * @brief 
+ * 
+ * @param xc 
+ * @param yc 
+ * @param x 
+ * @param y 
+ * @param color 
+ */
+void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color);
 
 /**
  * @brief 
