@@ -41,7 +41,7 @@ extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 /*************************************************
  * Data structures
  *************************************************/
-typedef enum {
+typedef enum enum_type {
     BACKGROUND,
     RECTANGLE,
     CIRCLE,
@@ -90,11 +90,11 @@ typedef struct {
  * 
  */
 typedef struct {
-    uint8_t pos_x;          /* Top-left x-position  */
-    uint8_t pos_y;          /* Top-left y-position  */
+    int16_t pos_x;          /* Top-left x-position  */
+    int16_t pos_y;          /* Top-left y-position  */
     uint8_t height;         /* Width in pixels      */
     uint8_t width;          /* Width in pixels      */
-    uint16_t *data;         /* Ptr to sprite data   */
+    const uint16_t *data;   /* Ptr to sprite data   */
 } sprite_t;
 
 /**
@@ -186,7 +186,7 @@ void draw_sprite(sprite_t sprite);
  * @param item 
  * @param nitems
  */
-void build_frame(item_t *item, int nitems);
+void build_frame(item_t *items, int nitems);
 
 
 #endif // __ST7735S_GRAPHICS_H__

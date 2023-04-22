@@ -1,12 +1,17 @@
+set (SOURCES
+    "TheLordOfTheFakeRing.c"
+    "interface.c"
+)
+
 set(LIB
+    project_config
     joystick
     st7735s
     esp_rom
-    project_config
 )
 
 idf_component_register(
-                        SRCS "TheLordOfTheFakeRing.c"
-                        INCLUDE_DIRS "."
+                        SRCS ${SOURCES}
+                        INCLUDE_DIRS "." "include"
                         REQUIRES ${LIB}
 )

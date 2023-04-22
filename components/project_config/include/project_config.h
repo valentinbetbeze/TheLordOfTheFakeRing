@@ -115,4 +115,11 @@
 #define PX_PER_TRANSACTION  (MAX_TRANSFER_SIZE / 2)
 
 
+/*************************************************
+ * Game design parameters
+ ************************************************/
+#define MAX_ITEMS           40
+
+
+
 #endif // __PROJECT_CONFIG_H__

@@ -16,6 +16,7 @@
 #include "joystick.h"
 #include "st7735s_hal.h"
 #include "st7735s_graphics.h"
+#include "interface.h"
 #include "rom/ets_sys.h"
 
 /**
@@ -54,39 +55,24 @@ void app_main()
 
     // Set display backlight
     init_pwm_backlight();
-    set_backlight(30);
-    
-    uint8_t string1[] = "THE LORD OF\nTHE FAKE RING\nAWAITS...";
-    text_t text1 = {
-        .color      = GREEN,
-        .data       = string1,
-        .size       = sizeof(string1),
-        .pos_x      = 10,
-        .pos_y      = 80,
-    };
-    //draw_text(text1);
+    set_backlight(50);
 
-    circle_t circle = {
-        .color      = WHITE,
-        .pos_x      = LCD_WIDTH / 4,
-        .pos_y      = LCD_HEIGHT / 2,
-        .radius     = 30,
-        .thickness  = 1,
-    };
-    draw_circle(circle);
-    circle_t circle2 = {
-        .color      = SPI_SWAP_DATA_TX(0xFFDF, 16),
-        .pos_x      = 3 * LCD_WIDTH / 4,
-        .pos_y      = LCD_HEIGHT / 2,
-        .radius     = 30,
-        .thickness  = 5,
-    };
-    draw_circle(circle2);
-
-    push_frame();
+    item_t items[MAX_ITEMS] = {0};
 
     while(1) {
-        usleep(10*1000);
+        //usleep(10*1000);
+        for (int i = 0; i < 16; i++) {
+            uint8_t nitems = scan_map(shire, i, items);
+            build_frame(items, nitems);
+            push_frame();
+            usleep(10*1000);
+        }
+        for (int i = 15; i >= 0; i--) {
+            uint8_t nitems = scan_map(shire, i, items);
+            build_frame(items, nitems);
+            push_frame();
+            usleep(10*1000);
+        }
     }
 }
 

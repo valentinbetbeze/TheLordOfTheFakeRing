@@ -1,13 +1,10 @@
 set (SOURCES
     "fonts.c"
-)
-
-set(LIB
-    
+    "maps.c"
+    "sprites.c"
 )
 
 idf_component_register(
                         SRCS ${SOURCES}
                         INCLUDE_DIRS "include"
-                        REQUIRES ${LIB}
 )

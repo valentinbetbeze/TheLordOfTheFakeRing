@@ -1,5 +1,5 @@
 /**
- * @file st7735s_fonts.h
+ * @file fonts.h
  * @author valentin betbeze (valentin.betbeze@gmail.com)
  * @brief Header file containing fonts to use in the st7735s_graphics
  * functions.

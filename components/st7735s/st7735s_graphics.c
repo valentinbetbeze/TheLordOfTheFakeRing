@@ -148,8 +148,8 @@ void draw_text(text_t text)
 
 void draw_sprite(sprite_t sprite)
 {
-    for (int y = 0; y < sprite.height; y++) {
-        for (int x = 0; x < sprite.width; x++) {
+    for (uint8_t y = 0; y < sprite.height; y++) {
+        for (uint8_t x = 0; x < sprite.width; x++) {
             uint16_t color = sprite.data[y * sprite.width + x];
             if (color != TRANSPARENT) {
                 write_to_frame(x + sprite.pos_x, y + sprite.pos_y, color);
@@ -159,29 +159,37 @@ void draw_sprite(sprite_t sprite)
 }
 
 
-void build_frame(item_t *item, int nitems)
+void build_frame(item_t *items, int nitems)
 {
     for (int i = 0; i < nitems; i++) {
-        switch (item[i].type) {
+        /*
+        if ((items + i) == NULL) {
+            printf("Error: Trying to access unauthorized memory location\n \
+                    Make sure `nitems` input is correct.\n");
+            return;
+        };
+        */
+        switch (items[i].type) {
             case BACKGROUND:
-                fill_background(item[i].background_color);
+                fill_background(items[i].background_color);
                 break;
             case RECTANGLE:
-                draw_rectangle(item[i].rectangle);
+                draw_rectangle(items[i].rectangle);
                 break;
             case CIRCLE:
-                draw_circle(item[i].circle);
+                draw_circle(items[i].circle);
                 break;
             case TEXT:
-                draw_text(item[i].text);
+                draw_text(items[i].text);
                 break;
             case SPRITE:
-                draw_sprite(item[i].sprite);
+                draw_sprite(items[i].sprite);
                 break;
             default:
                 printf("Error: Item of index %i is unknown.\n", i);
                 break;
         };
+        
     }
 }
 
