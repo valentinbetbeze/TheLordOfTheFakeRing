@@ -1,32 +1,48 @@
 #include "st7735s_graphics.h"
 
 
-void write_to_frame(int16_t x, int16_t y, uint16_t data)
+void write_to_frame(int16_t x, int16_t y, uint16_t color)
 {
+    // Do not write if out of frame
     if (x < 0 || y < 0) {
         return;
     }
 
     uint16_t row, column;
+    /** Compute the amount of pixels to get to the pixel of position
+     * (x, y). This parameter is required to figure out which row/column
+     * of the frame the pixel will have to be placed in. */
     uint16_t npixel = LCD_HEIGHT * x + (y + 1);
     uint16_t quotient = (uint16_t) npixel / PX_PER_TRANSACTION;
     uint16_t remainder = (uint16_t) npixel % PX_PER_TRANSACTION;
 
+    /** Case A : display pixel (x, y): (0, 62) -> npixel  = 63 pixels
+     * There are 32 pixels per row, hence row 0 is full, and row 1 is filled
+     * up to 63 - 32 = 31 pixels. As the column index starts at 0, we're at
+     * column index 30.
+     * Result: (0, 62) -> frame[1][30] */
     if (remainder) {
         row = quotient;
         column = remainder - 1;
     }
+    /** Case B : display pixel (x, y): (0, 63) -> npixel  = 64 pixels
+     * There are 32 pixels per row, hence both row 0 and row 1 are full.
+     * The pixel of position (0, 63) is at the end of the second row of the
+     * frame.
+     * Note: Using the remainder here is not possible, as any multiple of
+     * PX_PER_TRANSACTION will give 0, which is not the column index we want.
+     * Result: (0, 63) -> frame[1][31] */
     else {
         row = quotient - 1;
         column = PX_PER_TRANSACTION - 1;
     }
 
-    // Do not *try* to write if out of frame
+    // Do not write if out of frame
     if ((NUM_TRANSACTIONS <= row) || (PX_PER_TRANSACTION <= column)) {
         return;
     }
 
-    frame[row][column] = data;
+    frame[row][column] = color;
 }
 
 
@@ -66,6 +82,7 @@ void draw_rectangle(rectangle_t rectangle)
 
 
 void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color) {
+    // Draw 8 pixels at once, one for each octant
     write_to_frame((int16_t)xc + x, (int16_t)yc + y, color);
     write_to_frame((int16_t)xc + y, (int16_t)yc + x, color);
     write_to_frame((int16_t)xc + y, (int16_t)yc - x, color);
@@ -110,9 +127,11 @@ void draw_text(text_t text)
     uint8_t px_pos_x, px_pos_y, offset = 0;
 
     for (int text_index = 0; text_index < text.size; text_index++) {
+        // End of text
         if (text.data[text_index] == '\0') {
             break;
         }
+        // New line
         else if (text.data[text_index] == '\n') {
             text.pos_y += FONT_SIZE + TEXT_PADDING_Y;
             offset = text_index + 1;
@@ -123,8 +142,9 @@ void draw_text(text_t text)
             text.data[text_index], text.data[text_index]);
         }
         else {
-            /** Using the character ascii code (ex:65 for 'A'), get the corresponding
-             * letter sprite and iterate through each layer of the sprite */
+            /** Using the character ascii code (ex:65 for 'A'), get the
+             * corresponding letter sprite and iterate through each layer
+             * of the sprite */
             uint8_t char_index = text.data[text_index]-FIRST_ASCII;
 
             for (int layer_index = 0; layer_index < FONT_SIZE; layer_index++) {

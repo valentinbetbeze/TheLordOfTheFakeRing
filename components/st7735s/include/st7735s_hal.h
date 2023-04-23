@@ -88,7 +88,17 @@
 /*************************************************
  * Extern variables
  *************************************************/
-extern spi_device_handle_t tft_handle;
+/**
+ * @brief 2D-array representing the display frame to be sent to the
+ * TFT LCD screen. 
+ * 
+ * @note The array is sized specifically to get optimized
+ * SPI transfer speed, effectively allowing the maximum amount of
+ * bytes to be sent per transaction.
+ * Both row and column sizes are determined at compile-time in
+ * project_config.h, depending on the chosen SPI parameters and
+ * display resolution.
+ */
 extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 
 
@@ -112,56 +122,52 @@ void set_backlight(uint8_t percent);
 /**
  * @brief Initialize the spi bus and device interface for the TFT
  * LCD display.
+ * 
+ * @param handle Pointer to the SPI device handle of the display.
  */
-void init_spi(void);
+void init_spi(spi_device_handle_t *handle);
 
 /**
  * @brief Send a command to the ST7735S chip.
  * 
+ * @param handle SPI device handle of the display.
  * @param command 8-bit command (see ST7735S datasheet p.104)
  */
-void send_command(uint8_t command);
+void send_command(spi_device_handle_t handle, uint8_t command);
 
 /**
  * @brief Send a byte to the ST7735S chip.
  * 
+ * @param handle SPI device handle of the display.
  * @param data Pointer to the data to be sent.
  * @param len Amount of data in byte.
  */
-void send_byte(uint8_t *data, size_t len);
+void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len);
 
 /**
  * @brief Send a WORD (2 bytes) to the ST7735S chip.
  * 
+ * @param handle SPI device handle of the display.
  * @param data Pointer to the data to be sent.
  * @param len Amount of data in byte.
  */
-void send_word(uint16_t *data, size_t len);
+void send_word(spi_device_handle_t handle, uint16_t *data, size_t len);
 
 /**
  * @brief Initialize the TFT display.
- */
-void init_tft(void);
-
-/**
- * @brief Set the TFT display area onto which writing data.
  * 
- * @param xs Start column
- * @param xe End column
- * @param ys Start row
- * @param ye End row
- * 
- * @warning This function is dependant on the display orientation.
+ * @param handle SPI device handle of the display.
  */
-void set_display_area(uint8_t xs, uint8_t xe, uint8_t ys, uint8_t ye);
+void init_tft(spi_device_handle_t handle);
 
 /**
  * @brief Send the frame to the ST7735S chip via SPI.
  * 
- * @note Transmits the data by transactions of 64 bytes if DMA is 
+ * @param handle SPI device handle of the display.
+ * @note Transmits the data per transactions of 64 bytes if DMA is 
  * disabled, 4092 bytes is enabled.
  */
-void push_frame(void);
+void push_frame(spi_device_handle_t handle);
 
 
 #endif // __ST7735S_HAL_H__

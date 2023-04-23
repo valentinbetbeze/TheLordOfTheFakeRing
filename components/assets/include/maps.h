@@ -22,6 +22,10 @@
 #define NB_BLOCKS_X         (10)       /* Number of blocks on the x-axis */
 #define NB_BLOCKS_Y         (8)        /* Number of blocks on the y-axis */
 
+
+/*************************************************
+ * Maps
+ *************************************************/
 extern const uint8_t shire[][BLOCK_SIZE];
 
 

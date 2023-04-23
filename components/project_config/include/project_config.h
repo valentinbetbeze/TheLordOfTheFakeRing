@@ -118,7 +118,8 @@
 /*************************************************
  * Game design parameters
  ************************************************/
-#define MAX_ITEMS           40
+#define MAX_ITEMS           40  /* Maximum amount of items on 1 frame. Can be
+                                 increased at the cost of memory */
 
 
 

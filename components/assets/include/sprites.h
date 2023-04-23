@@ -14,6 +14,10 @@
 #include <stdint.h>
 #include "maps.h"
 
+
+/*************************************************
+ * Sprites
+ *************************************************/
 extern const uint16_t shire_block_1[BLOCK_SIZE * BLOCK_SIZE];
 extern const uint16_t shire_block_2[BLOCK_SIZE * BLOCK_SIZE];
 

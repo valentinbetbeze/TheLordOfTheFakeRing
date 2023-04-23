@@ -19,19 +19,6 @@
 #include "interface.h"
 #include "rom/ets_sys.h"
 
-/**
- * @brief TFT display handle on the SPI bus
- * @note Set as global variable to avoid having to pass it as an 
- * arguments every time an SPI communication takes place.
- */
-spi_device_handle_t tft_handle;
-
-/**
- * @brief 
- * 
- */
-uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
-
 
 void app_main()
 {
@@ -44,11 +31,11 @@ void app_main()
     gpio_config(&io_conf);
 
     // Initialize SPI bus
-    init_spi();
+    spi_device_handle_t tft_handle;
+    init_spi(&tft_handle);
 
     // Initialize LCD display
-    init_tft();
-    set_display_area(0, 127, 0, 159);
+    init_tft(tft_handle);
 
     // Set background
     fill_background(BLACK);
@@ -64,13 +51,13 @@ void app_main()
         for (int i = 0; i < 16; i++) {
             uint8_t nitems = scan_map(shire, i, items);
             build_frame(items, nitems);
-            push_frame();
+            push_frame(tft_handle);
             usleep(10*1000);
         }
         for (int i = 15; i >= 0; i--) {
             uint8_t nitems = scan_map(shire, i, items);
             build_frame(items, nitems);
-            push_frame();
+            push_frame(tft_handle);
             usleep(10*1000);
         }
     }
