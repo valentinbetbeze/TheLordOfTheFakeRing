@@ -6,7 +6,7 @@ set(LIB
 )
 
 idf_component_register(
-                        SRCS "joystick.c"
+                        SRCS "gamepad.c"
                         INCLUDE_DIRS "include"
                         REQUIRES ${LIB}
 )

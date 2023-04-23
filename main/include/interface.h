@@ -27,7 +27,7 @@
  * @param[out] items Array of items
  * @return Number of items
  */
-uint8_t scan_map(const uint8_t map[][BLOCK_SIZE], uint16_t map_x, item_t items[]);
+uint8_t scan_map(const uint8_t map[][NB_BLOCKS_Y], uint16_t map_x, item_t items[]);
 
 
 #endif // __INTERFACE_H__

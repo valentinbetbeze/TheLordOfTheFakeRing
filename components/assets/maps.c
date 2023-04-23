@@ -1,7 +1,7 @@
 #include "maps.h"
 
 
-const uint8_t shire[][BLOCK_SIZE] = {
+const uint8_t shire[][NB_BLOCKS_Y] = {
     /* Map header */
     {
         0x01,               /* map id                   */

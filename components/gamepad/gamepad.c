@@ -1,8 +1,12 @@
-#include "joystick.h"
+#include "gamepad.h"
 
 
-void init_button(button_t *btn, gpio_num_t gpio_num)
+void gamepad_init_button(button_t *btn, gpio_num_t gpio_num)
 {
+    if (btn == NULL) {
+        printf("Error: `btn` pointer is NULL.\n");
+        return;
+    }
     btn->gpio_num = gpio_num;
     gpio_reset_pin(btn->gpio_num);
     gpio_set_direction(btn->gpio_num, GPIO_MODE_INPUT);
@@ -11,8 +15,12 @@ void init_button(button_t *btn, gpio_num_t gpio_num)
 }
 
 
-uint8_t poll_button(button_t *btn)
+uint8_t gamepad_poll_button(button_t *btn)
 {
+    if (btn == NULL) {
+        printf("Error: `btn` pointer is NULL.\n");
+        return 0;
+    }
     btn->current_state = (uint8_t) gpio_get_level(btn->gpio_num);
     if (btn->current_state != btn->previous_state) {
         // Update previous state
@@ -26,7 +34,7 @@ uint8_t poll_button(button_t *btn)
 }
 
 
-joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
+joystick_t gamepad_create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
 {
     joystick_t joystick;
     const uint8_t y_scale = 100;        /*!< So that JOY_MAX_N = 100% */
@@ -49,8 +57,17 @@ joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
 }
 
 
-void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick)
+void gamepad_init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick)
 {
+    if (handle == NULL) {
+        printf("Error: `handle` pointer is NULL.\n");
+        return;
+    }
+    if (joystick == NULL) {
+        printf("Error: `joystick` pointer is NULL.\n");
+        return;
+    }
+
     adc_oneshot_unit_init_cfg_t unit_cfg = {
         .unit_id = ADC_UNIT_2,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
@@ -74,7 +91,7 @@ void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick)
 }
 
 
-int8_t read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis)
+int8_t gamepad_read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis)
 {
     int8_t value = 0;
     int raw_value = 0;

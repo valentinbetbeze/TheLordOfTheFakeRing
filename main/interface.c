@@ -1,7 +1,7 @@
 #include "interface.h"
 
 
-uint8_t scan_map(const uint8_t map[][BLOCK_SIZE], uint16_t map_x, item_t items[])
+uint8_t scan_map(const uint8_t map[][NB_BLOCKS_Y], uint16_t map_x, item_t items[])
 {
     if (map == NULL) {
         printf("Error: Map file does not exist.\n");

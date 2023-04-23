@@ -48,6 +48,7 @@ extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
  * @brief Type of graphic item. Used in item_t objects.
 */
 typedef enum enum_type {
+    NONE,
     BACKGROUND,
     RECTANGLE,
     CIRCLE,
@@ -124,62 +125,34 @@ typedef struct {
 /*************************************************
  * Prototypes
  *************************************************/
-
-/**
- * @brief Write a pixel of information to the frame, taking the
- * cartesian coordinates of the display as input.
- * 
- * @param x Position of the pixel on the x-axis (along width)
- * @param y Position of the pixel on the y-axis (along height)
- * @param data Color of the pixel
- */
-void write_to_frame(int16_t x, int16_t y, uint16_t color);
-
 /**
  * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
  * 
  * @param rgb888 24-bit color code
  * @return The corresponding 16-bit color code
  */
-uint16_t rgb565(uint32_t rgb888);
+uint16_t st7735s_rgb565(uint32_t rgb888);
 
 /**
  * @brief Fill the background color of the frame.
  * 
  * @param color Background color
  */
-void fill_background(uint16_t color);
+void st7735s_fill_background(uint16_t color);
 
 /**
  * @brief Draw a rectangle on the frame.
  * 
  * @param rectangle Rectangle object.
  */
-void draw_rectangle(rectangle_t rectangle);
-
-/**
- * @brief Rasterize 1 point-per-octant of a circle, for all
- * 8 octants.
- * 
- * @param xc Center of the circle on the x-axis.
- * @param yc Center of the circle on the y-axis.
- * @param x Location of one point on the x-axis. 
- * @param y Location of one point on the y-axis.
- * @param color Color of the circle.
- * 
- * @note It does not matter which initial position of one of the
- * 8 points is given as input, the function will draw the 8 pixels
- * independently. However, note that the (x, y) coordinates must 
- * belong to the same point.
- */
-void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color);
+void st7735s_draw_rectangle(rectangle_t rectangle);
 
 /**
  * @brief Draw a circle on the frame.
  * 
  * @param circle Circle object.
  */
-void draw_circle(circle_t circle);
+void st7735s_draw_circle(circle_t circle);
 
 /**
  * @brief Display a text on the frame.
@@ -189,7 +162,7 @@ void draw_circle(circle_t circle);
  * project configuration header file (project_config.h).
  * @note 2. Currently, draw_text() only supports the use of one font.
  */
-void draw_text(text_t text);
+void st7735s_draw_text(text_t text);
 
 /**
  * @brief Draw a sprite on the frame.
@@ -199,7 +172,7 @@ void draw_text(text_t text);
  * transparent by the function, and hence will not be sent
  * to the frame.
  */
-void draw_sprite(sprite_t sprite);
+void st7735s_draw_sprite(sprite_t sprite);
 
 /**
  * @brief Build the frame with the given items.
@@ -210,7 +183,7 @@ void draw_sprite(sprite_t sprite);
  * @note The function iterates through the given array of items, checks 
  * each item and passes it to the appropriate 'draw_' function.
  */
-void build_frame(item_t *items, int nitems);
+void st7735s_build_frame(item_t *items, int nitems);
 
 
 #endif // __ST7735S_GRAPHICS_H__

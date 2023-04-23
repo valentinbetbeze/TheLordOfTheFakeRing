@@ -1,7 +1,15 @@
 #include "st7735s_graphics.h"
 
 
-void write_to_frame(int16_t x, int16_t y, uint16_t color)
+/**
+ * @brief Write a pixel of information to the frame, taking the
+ * cartesian coordinates of the display as input.
+ * 
+ * @param x Position of the pixel on the x-axis (along width)
+ * @param y Position of the pixel on the y-axis (along height)
+ * @param data Color of the pixel
+ */
+static void write_to_frame(int16_t x, int16_t y, uint16_t color)
 {
     // Do not write if out of frame
     if (x < 0 || y < 0) {
@@ -46,7 +54,36 @@ void write_to_frame(int16_t x, int16_t y, uint16_t color)
 }
 
 
-uint16_t rgb565(uint32_t rgb888)
+/**
+ * @brief Rasterize 1 point-per-octant of a circle, for all
+ * 8 octants.
+ * 
+ * @param xc Center of the circle on the x-axis.
+ * @param yc Center of the circle on the y-axis.
+ * @param x Location of one point on the x-axis. 
+ * @param y Location of one point on the y-axis.
+ * @param color Color of the circle.
+ * 
+ * @note It does not matter which initial position of one of the
+ * 8 points is given as input, the function will draw the 8 pixels
+ * independently. However, note that the (x, y) coordinates must 
+ * belong to the same point.
+ */
+static void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color)
+{
+    // Draw 8 pixels at once, one for each octant
+    write_to_frame((int16_t)xc + x, (int16_t)yc + y, color);
+    write_to_frame((int16_t)xc + y, (int16_t)yc + x, color);
+    write_to_frame((int16_t)xc + y, (int16_t)yc - x, color);
+    write_to_frame((int16_t)xc + x, (int16_t)yc - y, color);
+    write_to_frame((int16_t)xc - x, (int16_t)yc - y, color);
+    write_to_frame((int16_t)xc - y, (int16_t)yc - x, color);
+    write_to_frame((int16_t)xc - y, (int16_t)yc + x, color);
+    write_to_frame((int16_t)xc - x, (int16_t)yc + y, color);
+}
+
+
+uint16_t st7735s_rgb565(uint32_t rgb888)
 {
     // Convert each color in the new format
     uint8_t red = (uint8_t) (((rgb888 >> 16) * 31) / 255);
@@ -61,7 +98,7 @@ uint16_t rgb565(uint32_t rgb888)
 }
 
 
-void fill_background(uint16_t color)
+void st7735s_fill_background(uint16_t color)
 {
     for (int i = 0; i < NUM_TRANSACTIONS; i++) {
         for (int j = 0; j < PX_PER_TRANSACTION; j++) {
@@ -71,7 +108,7 @@ void fill_background(uint16_t color)
 }
 
 
-void draw_rectangle(rectangle_t rectangle)
+void st7735s_draw_rectangle(rectangle_t rectangle)
 {
     for (int x = rectangle.pos_x; x < (rectangle.pos_x + rectangle.width); x++) {
         for (int y = rectangle.pos_y; y < (rectangle.pos_y + rectangle.height); y++) {
@@ -81,20 +118,7 @@ void draw_rectangle(rectangle_t rectangle)
 }
 
 
-void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color) {
-    // Draw 8 pixels at once, one for each octant
-    write_to_frame((int16_t)xc + x, (int16_t)yc + y, color);
-    write_to_frame((int16_t)xc + y, (int16_t)yc + x, color);
-    write_to_frame((int16_t)xc + y, (int16_t)yc - x, color);
-    write_to_frame((int16_t)xc + x, (int16_t)yc - y, color);
-    write_to_frame((int16_t)xc - x, (int16_t)yc - y, color);
-    write_to_frame((int16_t)xc - y, (int16_t)yc - x, color);
-    write_to_frame((int16_t)xc - y, (int16_t)yc + x, color);
-    write_to_frame((int16_t)xc - x, (int16_t)yc + y, color);
-}
-
-
-void draw_circle(circle_t circle)
+void st7735s_draw_circle(circle_t circle)
 {
     // https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
     uint8_t y_out, y_in;
@@ -122,7 +146,7 @@ void draw_circle(circle_t circle)
 }
 
 
-void draw_text(text_t text)
+void st7735s_draw_text(text_t text)
 {
     uint8_t px_pos_x, px_pos_y, offset = 0;
 
@@ -166,7 +190,7 @@ void draw_text(text_t text)
 }
 
 
-void draw_sprite(sprite_t sprite)
+void st7735s_draw_sprite(sprite_t sprite)
 {
     for (uint8_t y = 0; y < sprite.height; y++) {
         for (uint8_t x = 0; x < sprite.width; x++) {
@@ -179,37 +203,33 @@ void draw_sprite(sprite_t sprite)
 }
 
 
-void build_frame(item_t *items, int nitems)
+void st7735s_build_frame(item_t *items, int nitems)
 {
     for (int i = 0; i < nitems; i++) {
-        /*
         if ((items + i) == NULL) {
-            printf("Error: Trying to access unauthorized memory location\n \
-                    Make sure `nitems` input is correct.\n");
+            printf("Error: Trying to access unauthorized memory location.\n");
             return;
         };
-        */
         switch (items[i].type) {
             case BACKGROUND:
-                fill_background(items[i].background_color);
+                st7735s_fill_background(items[i].background_color);
                 break;
             case RECTANGLE:
-                draw_rectangle(items[i].rectangle);
+                st7735s_draw_rectangle(items[i].rectangle);
                 break;
             case CIRCLE:
-                draw_circle(items[i].circle);
+                st7735s_draw_circle(items[i].circle);
                 break;
             case TEXT:
-                draw_text(items[i].text);
+                st7735s_draw_text(items[i].text);
                 break;
             case SPRITE:
-                draw_sprite(items[i].sprite);
+                st7735s_draw_sprite(items[i].sprite);
                 break;
             default:
-                printf("Error: Item of index %i is unknown.\n", i);
+                printf("Error (st7735s_build_frame): Unknown item has been given as input. Please check items[] or nitems variables.\n");
                 break;
         };
         
     }
 }
-

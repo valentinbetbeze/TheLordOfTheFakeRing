@@ -110,55 +110,21 @@ extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
  * @brief Initialize the ESP32 PWM channel for the control of the 
  * TFT backlight intensity.
  */
-void init_pwm_backlight(void);
+void st7735s_init_pwm_backlight(void);
 
 /**
  * @brief Set the backlight intensity of the TFT display.
  * 
  * @param percent Backlight intensity in percentage.
  */
-void set_backlight(uint8_t percent);
-
-/**
- * @brief Initialize the spi bus and device interface for the TFT
- * LCD display.
- * 
- * @param handle Pointer to the SPI device handle of the display.
- */
-void init_spi(spi_device_handle_t *handle);
-
-/**
- * @brief Send a command to the ST7735S chip.
- * 
- * @param handle SPI device handle of the display.
- * @param command 8-bit command (see ST7735S datasheet p.104)
- */
-void send_command(spi_device_handle_t handle, uint8_t command);
-
-/**
- * @brief Send a byte to the ST7735S chip.
- * 
- * @param handle SPI device handle of the display.
- * @param data Pointer to the data to be sent.
- * @param len Amount of data in byte.
- */
-void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len);
-
-/**
- * @brief Send a WORD (2 bytes) to the ST7735S chip.
- * 
- * @param handle SPI device handle of the display.
- * @param data Pointer to the data to be sent.
- * @param len Amount of data in byte.
- */
-void send_word(spi_device_handle_t handle, uint16_t *data, size_t len);
+void st7735s_set_backlight(uint8_t percent);
 
 /**
  * @brief Initialize the TFT display.
  * 
  * @param handle SPI device handle of the display.
  */
-void init_tft(spi_device_handle_t handle);
+void st7735s_init_tft(spi_device_handle_t handle);
 
 /**
  * @brief Send the frame to the ST7735S chip via SPI.
@@ -167,7 +133,7 @@ void init_tft(spi_device_handle_t handle);
  * @note Transmits the data per transactions of 64 bytes if DMA is 
  * disabled, 4092 bytes is enabled.
  */
-void push_frame(spi_device_handle_t handle);
+void st7735s_push_frame(spi_device_handle_t handle);
 
 
 #endif // __ST7735S_HAL_H__

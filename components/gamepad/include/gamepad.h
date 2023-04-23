@@ -1,13 +1,13 @@
 /**
- * @file joystick.h
+ * @file gamepad.h
  * @author valentin betbeze (valentin.betbeze@gmail.com)
- * @brief 
+ * @brief Header file of the Funduino JoyStick V1.A gamepad.
  * @date 2023-04-10
  * 
  */
 
-#ifndef __JOYSTICK_H__
-#define __JOYSTICK_H__
+#ifndef __GAMEPAD_H__
+#define __GAMEPAD_H__
 
 
 #include <stdint.h>
@@ -85,7 +85,7 @@ typedef struct {
  * @param btn       Button to initialize
  * @param gpio_num  GPIO pin of the button
  */
-void init_button(button_t *btn, gpio_num_t gpio_num);
+void gamepad_init_button(button_t *btn, gpio_num_t gpio_num);
 
 /**
  * @brief Check if a button has been pressed.
@@ -93,7 +93,7 @@ void init_button(button_t *btn, gpio_num_t gpio_num);
  * @param btn   Button to poll
  * @return 1 if pressed, 0 otherwise
  */
-uint8_t poll_button(button_t *btn);
+uint8_t gamepad_poll_button(button_t *btn);
 
 /**
  * @brief Create and configure a joystick object
@@ -102,7 +102,7 @@ uint8_t poll_button(button_t *btn);
  * @param idle_val_y ADC raw value while y-axis is idle
  * @return Joystick object
  */
-joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y);
+joystick_t gamepad_create_joystick(uint16_t idle_val_x, uint16_t idle_val_y);
 
 /**
  * @brief Initialize the joystick.
@@ -110,7 +110,7 @@ joystick_t create_joystick(uint16_t idle_val_x, uint16_t idle_val_y);
  * @param handle ADC unit handle for oneshot mode
  * @param joystick Joystick's constants
  */
-void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick);
+void gamepad_init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick);
 
 /**
  * @brief Read and process the value of a joystick's axis.
@@ -119,7 +119,7 @@ void init_joystick(adc_oneshot_unit_handle_t *handle, joystick_t *joystick);
  * @param axis Joystick axis
  * @return The processed value of the axis, on a scale from -100% to +100%
  */
-int8_t read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis);
+int8_t gamepad_read_joystick_axis(adc_oneshot_unit_handle_t handle, axis_t axis);
 
 
-#endif // __JOYSTICK_H__
+#endif // __GAMEPAD_H__

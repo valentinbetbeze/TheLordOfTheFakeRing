@@ -1,6 +1,5 @@
 {
     "files.associations": {
-        "joystick.h": "c",
         "esp_timer.h": "c",
         "esp_err.h": "c",
         "ets_sys.h": "c",
@@ -29,6 +28,7 @@
         "thelordofthefakering.h": "c",
         "interface.h": "c",
         "sprites.h": "c",
-        "map": "c"
+        "map": "c",
+        "gamepad.h": "c"
     }
 }

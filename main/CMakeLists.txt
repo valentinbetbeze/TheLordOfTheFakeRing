@@ -5,7 +5,7 @@ set (SOURCES
 
 set(LIB
     project_config
-    joystick
+    gamepad
     st7735s
     esp_rom
 )

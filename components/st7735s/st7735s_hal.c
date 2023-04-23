@@ -1,10 +1,65 @@
 #include "st7735s_hal.h"
 
-
 uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
 
 
-void init_pwm_backlight(void)
+/**
+ * @brief Send a command to the ST7735S chip.
+ * 
+ * @param handle SPI device handle of the display.
+ * @param command 8-bit command (see ST7735S datasheet p.104)
+ */
+static void send_command(spi_device_handle_t handle, uint8_t command)
+{
+    spi_transaction_t transaction;
+    memset(&transaction, 0, sizeof(transaction));
+    transaction.length = 8;
+    transaction.tx_buffer = &command;
+    
+    gpio_set_level(PIN_LCD_DC, 0); // Enable command mode
+    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
+}
+
+
+/**
+ * @brief Send a byte to the ST7735S chip.
+ * 
+ * @param handle SPI device handle of the display.
+ * @param data Pointer to the data to be sent.
+ * @param len Amount of data in byte.
+ */
+static void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len)
+{
+    spi_transaction_t transaction;
+    memset(&transaction, 0, sizeof(transaction));
+    transaction.length = 8 * len;
+    transaction.tx_buffer = data;
+    
+    gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
+    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
+}
+
+
+/**
+ * @brief Send a WORD (2 bytes) to the ST7735S chip.
+ * 
+ * @param handle SPI device handle of the display.
+ * @param data Pointer to the data to be sent.
+ * @param len Amount of data in byte.
+ */
+static void send_word(spi_device_handle_t handle, uint16_t *data, size_t len)
+{
+    spi_transaction_t transaction;
+    memset(&transaction, 0, sizeof(transaction));
+    transaction.length = 8 * len;
+    transaction.tx_buffer = data;
+    
+    gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
+    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
+}
+
+
+void st7735s_init_pwm_backlight(void)
 {
     // Prepare and then apply the LEDC PWM timer configuration
     ledc_timer_config_t LCD_timer_config = {
@@ -30,8 +85,11 @@ void init_pwm_backlight(void)
 }
 
 
-void set_backlight(uint8_t percent)
+void st7735s_set_backlight(uint8_t percent)
 {
+    if (percent > 100) {
+        percent = 100;
+    }
     uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percent / 100;
     // Set duty cycle
     ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty);
@@ -40,69 +98,7 @@ void set_backlight(uint8_t percent)
 }
 
 
-void init_spi(spi_device_handle_t *handle)
-{
-    const spi_bus_config_t spi_bus_cfg = {
-        .mosi_io_num = PIN_LCD_SDA,
-        .miso_io_num = -1,
-        .sclk_io_num = PIN_LCD_SCK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1
-    };
-    spi_bus_initialize(SPI_LCD_HOST, &spi_bus_cfg, SPI_LCD_DMA);
-
-    // Create SPI device handle
-    const spi_device_interface_config_t spi_dev_cfg = {
-        .clock_speed_hz = SPI_LCD_FREQUENCY,
-        .mode = SPI_LCD_MODE,                            
-        .spics_io_num = PIN_LCD_CS, 
-        .queue_size = SPI_LCD_QSIZE,
-        .flags = SPI_LCD_FLAGS,
-        .command_bits = 0,
-        .address_bits = 0,
-        .dummy_bits = 0
-    };
-    spi_bus_add_device(SPI_LCD_HOST, &spi_dev_cfg, handle);
-}
-
-
-void send_command(spi_device_handle_t handle, uint8_t command)
-{
-    spi_transaction_t transaction;
-    memset(&transaction, 0, sizeof(transaction));
-    transaction.length = 8;
-    transaction.tx_buffer = &command;
-    
-    gpio_set_level(PIN_LCD_DC, 0); // Enable command mode
-    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
-}
-
-
-void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len)
-{
-    spi_transaction_t transaction;
-    memset(&transaction, 0, sizeof(transaction));
-    transaction.length = 8 * len;
-    transaction.tx_buffer = data;
-    
-    gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
-    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
-}
-
-
-void send_word(spi_device_handle_t handle, uint16_t *data, size_t len)
-{
-    spi_transaction_t transaction;
-    memset(&transaction, 0, sizeof(transaction));
-    transaction.length = 8 * len;
-    transaction.tx_buffer = data;
-    
-    gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
-    ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
-}
-
-
-void init_tft(spi_device_handle_t handle)
+void st7735s_init_tft(spi_device_handle_t handle)
 {
     uint8_t parameter;
     // Hardware reset
@@ -181,7 +177,7 @@ void init_tft(spi_device_handle_t handle)
 }
 
 
-void push_frame(spi_device_handle_t handle)
+void st7735s_push_frame(spi_device_handle_t handle)
 {
     send_command(handle, RAMWR);
     for (int i = 0; i < NUM_TRANSACTIONS; i++) {

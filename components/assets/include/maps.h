@@ -26,7 +26,7 @@
 /*************************************************
  * Maps
  *************************************************/
-extern const uint8_t shire[][BLOCK_SIZE];
+extern const uint8_t shire[][NB_BLOCKS_Y];
 
 
 #endif // __MAPS_H__
