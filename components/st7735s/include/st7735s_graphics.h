@@ -31,7 +31,7 @@
 #define BLUE                (SPI_SWAP_DATA_TX(0x001F, 16))
 #define WHITE               (SPI_SWAP_DATA_TX(0xFFDF, 16))
 #define BLACK               (0x0000)
-#define TRANSPARENT         (0xFFFF) /* Full white = transparency */
+#define TRANSPARENT         (0xFFFF) // Full white = transparency
 
 
 /*************************************************
@@ -45,28 +45,16 @@ extern uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
  *************************************************/
 
 /**
- * @brief Type of graphic item. Used in item_t objects.
-*/
-typedef enum enum_type {
-    NONE,
-    BACKGROUND,
-    RECTANGLE,
-    CIRCLE,
-    TEXT,
-    SPRITE
-} item_type_t;
-
-/**
  * @brief Rectangle object to be displayed onto the frame.
  * @note A line can be made with a thickness of 1 and the desired
  * height/width.
  */
 typedef struct {
-    uint8_t pos_x;          /* Top-left x-position  */
-    uint8_t pos_y;          /* Top-left y-position  */
-    uint8_t height;         /* Width in pixels      */
-    uint8_t width;          /* Width in pixels      */
-    uint16_t color;         /* 16-bit format        */
+    uint8_t pos_x;          // Top-left x-position    
+    uint8_t pos_y;          // Top-left y-position    
+    uint8_t height;         // Width in pixels        
+    uint8_t width;          // Width in pixels        
+    uint16_t color;         // 16-bit format          
 } rectangle_t;
 
 /**
@@ -75,11 +63,11 @@ typedef struct {
  * the circle thickness is drawn inwards.
  */
 typedef struct {
-    uint8_t pos_x;          /* Center x-position    */
-    uint8_t pos_y;          /* Center y-position    */
-    uint8_t radius;         /* Radius in pixels     */
-    uint8_t thickness;      /* Thinkness in pixels  */
-    uint16_t color;         /* 16-bit format        */
+    uint8_t pos_x;          // Center x-position      
+    uint8_t pos_y;          // Center y-position      
+    uint8_t radius;         // Radius in pixels       
+    uint8_t thickness;      // Thinkness in pixels    
+    uint16_t color;         // 16-bit format          
 } circle_t;
 
 /**
@@ -87,44 +75,29 @@ typedef struct {
  * parameter refer to the length of the text, in bytes.
  */
 typedef struct {
-    uint8_t pos_x;          /* Top-left x-position  */
-    uint8_t pos_y;          /* Top-left y-position  */
-    uint16_t color;         /* 16-bit format        */
-    uint8_t size;           /* Text size in bytes   */
-    uint8_t *data;          /* Ptr to char array    */
+    uint8_t pos_x;          // Top-left x-position    
+    uint8_t pos_y;          // Top-left y-position    
+    uint16_t color;         // 16-bit format          
+    uint8_t size;           // Text size in bytes     
+    uint8_t *data;          // Ptr to char array      
 } text_t;
 
 /**
  * @brief Sprite object to be displayed onto the frame.
  */
 typedef struct {
-    int16_t pos_x;          /* Top-left x-position  */
-    int16_t pos_y;          /* Top-left y-position  */
-    uint8_t height;         /* Width in pixels      */
-    uint8_t width;          /* Width in pixels      */
-    const uint16_t *data;   /* Ptr to sprite data   */
+    int16_t pos_x;          // Top-left x-position    
+    int16_t pos_y;          // Top-left y-position    
+    uint8_t height;         // Width in pixels        
+    uint8_t width;          // Width in pixels        
+    const uint16_t *data;   // Pointer to sprite data 
 } sprite_t;
-
-/**
- * @brief Generic graphic item that can be any of the specific
- * graphic object from this library. Useful when you don't know
- * which types of item is going to be displayed at compile time.
- */
-typedef struct {
-    item_type_t type;
-    union {
-        uint16_t background_color;
-        rectangle_t rectangle;
-        circle_t circle;
-        text_t text;
-        sprite_t sprite;
-    };
-} item_t;
 
 
 /*************************************************
  * Prototypes
  *************************************************/
+
 /**
  * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
  * 
@@ -173,17 +146,6 @@ void st7735s_draw_text(text_t text);
  * to the frame.
  */
 void st7735s_draw_sprite(sprite_t sprite);
-
-/**
- * @brief Build the frame with the given items.
- * 
- * @param item Pointer to the array of items.
- * @param nitems Number of items.
- * 
- * @note The function iterates through the given array of items, checks 
- * each item and passes it to the appropriate 'draw_' function.
- */
-void st7735s_build_frame(item_t *items, int nitems);
 
 
 #endif // __ST7735S_GRAPHICS_H__

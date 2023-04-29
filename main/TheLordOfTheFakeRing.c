@@ -8,7 +8,6 @@
  */
 
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -16,8 +15,10 @@
 #include "gamepad.h"
 #include "st7735s_hal.h"
 #include "st7735s_graphics.h"
-#include "interface.h"
+#include "game_engine.h"
 #include "rom/ets_sys.h"
+#include "soc/timer_group_struct.h"
+#include "soc/timer_group_reg.h"
 
 
 void app_main()
@@ -61,31 +62,64 @@ void app_main()
     // Initialize LCD display
     st7735s_init_tft(tft_handle);
     st7735s_fill_background(BLACK);
+    st7735s_push_frame(tft_handle);
     st7735s_init_pwm_backlight();
     st7735s_set_backlight(50);
+
+    // Create and initialize joystick
+    joystick_t joystick = gamepad_create_joystick(JOY_MID_X, JOY_MID_Y);
+    adc_oneshot_unit_handle_t adc_handle;
+    gamepad_init_joystick(&adc_handle, &joystick);
 #pragma endregion
 
 
     /*************************************************
      * Program body
      *************************************************/
-    uint8_t nitems = 0;
-    item_t items[MAX_ITEMS] = {0};      /* Array of graphic items */
+
+    uint16_t map_x = 0;
+    const int8_t (*map)[NB_BLOCKS_Y] = shire;
+    character_t player = {
+        .life           = 3,
+        .speed          = 2,
+        .sprite.height  = BLOCK_SIZE,
+        .sprite.width   = BLOCK_SIZE,
+        .sprite.data    = sprite_player,
+        .sprite.pos_x   = 16,
+        .sprite.pos_y   = LCD_HEIGHT - 2 * BLOCK_SIZE,
+    };
 
     while(1) {
-        //usleep(10*1000);
-        for (int i = 0; i < 16; i++) {
-            nitems = scan_map(shire, i, items);
-            st7735s_build_frame(items, nitems);
-            st7735s_push_frame(tft_handle);
-            usleep(10*1000);
+        // Feed the task watchdog timer
+        TIMERG0.wdtwprotect.wdt_wkey = TIMG_WDT_WKEY_VALUE;
+        TIMERG0.wdtfeed.wdt_feed = 1;
+        TIMERG0.wdtwprotect.wdt_wkey = 0;
+
+        // Get the player's new position
+        int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
+        int8_t y = gamepad_read_joystick_axis(adc_handle, joystick.axis_y);
+        player.sprite.pos_x += player.speed * (int16_t)(x / 100);
+        player.sprite.pos_y -= player.speed * (int16_t)(y / 100);
+        if (player.sprite.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+            map_x += player.speed;
+            player.sprite.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
         }
-        for (int i = 15; i >= 0; i--) {
-            nitems = scan_map(shire, i, items);
-            st7735s_build_frame(items, nitems);
-            st7735s_push_frame(tft_handle);
-            usleep(10*1000);
+        else if (player.sprite.pos_x < 0) {
+            player.sprite.pos_x = 0;
         }
+        //player.sprite.pos_y += player.speed; // Basic gravity
+
+        /* Check for collisions with the environment, and update the player's
+         position if required */ 
+        if (check_block_collisions(map, &player, map_x) == -1) {
+            break;
+        }
+        update_position(&player);
+
+        // Build and display the frame
+        build_frame(map, map_x);
+        st7735s_draw_sprite(player.sprite);
+        st7735s_push_frame(tft_handle);
     }
 }
 
@@ -105,7 +139,7 @@ void app_main(void)
     gamepad_init_button(&button_F, PIN_BTN_F);
 
     // Create and initialize joystick
-    joystick_t joystick = create_joystick(JOY_MID_X, JOY_MID_Y);
+    joystick_t joystick = gamepad_create_joystick(JOY_MID_X, JOY_MID_Y);
     adc_oneshot_unit_handle_t adc_handle;
     gamepad_init_joystick(&adc_handle, &joystick);
 

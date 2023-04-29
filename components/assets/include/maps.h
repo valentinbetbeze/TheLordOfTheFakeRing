@@ -26,7 +26,7 @@
 /*************************************************
  * Maps
  *************************************************/
-extern const uint8_t shire[][NB_BLOCKS_Y];
+extern const int8_t shire[][NB_BLOCKS_Y];  /* Map of the first world: The Shire */
 
 
 #endif // __MAPS_H__

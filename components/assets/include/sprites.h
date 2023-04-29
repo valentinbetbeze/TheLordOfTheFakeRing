@@ -18,12 +18,14 @@
 /*************************************************
  * Sprites
  *************************************************/
-extern const uint16_t shire_block_1[BLOCK_SIZE * BLOCK_SIZE];
-extern const uint16_t shire_block_2[BLOCK_SIZE * BLOCK_SIZE];
+extern const uint16_t sprite_player[BLOCK_SIZE*BLOCK_SIZE];
 
-extern const uint16_t moria_block_1[BLOCK_SIZE * BLOCK_SIZE];
-extern const uint16_t moria_block_2[BLOCK_SIZE * BLOCK_SIZE];
-extern const uint16_t moria_block_3[BLOCK_SIZE * BLOCK_SIZE];
+extern const uint16_t shire_block_1[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t shire_block_2[BLOCK_SIZE*BLOCK_SIZE];
+
+extern const uint16_t moria_block_1[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t moria_block_2[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t moria_block_3[BLOCK_SIZE*BLOCK_SIZE];
 
 
 

@@ -11,41 +11,45 @@
  */
 static void write_to_frame(int16_t x, int16_t y, uint16_t color)
 {
-    // Do not write if out of frame
-    if (x < 0 || y < 0) {
+    // Do not write if out of display's resolution
+    if (x < 0 || LCD_WIDTH <= x || y < 0 || LCD_HEIGHT <= y ) {
         return;
     }
 
     uint16_t row, column;
-    /** Compute the amount of pixels to get to the pixel of position
-     * (x, y). This parameter is required to figure out which row/column
-     * of the frame the pixel will have to be placed in. */
+    /*
+     Compute the amount of pixels to get to the pixel of position
+     (x, y). This parameter is required to figure out which row/column
+     of the frame the pixel will have to be placed in.
+    */
     uint16_t npixel = LCD_HEIGHT * x + (y + 1);
     uint16_t quotient = (uint16_t) npixel / PX_PER_TRANSACTION;
     uint16_t remainder = (uint16_t) npixel % PX_PER_TRANSACTION;
-
-    /** Case A : display pixel (x, y): (0, 62) -> npixel  = 63 pixels
-     * There are 32 pixels per row, hence row 0 is full, and row 1 is filled
-     * up to 63 - 32 = 31 pixels. As the column index starts at 0, we're at
-     * column index 30.
-     * Result: (0, 62) -> frame[1][30] */
+    /*
+     Case A : display pixel (x, y): (0, 62) -> npixel  = 63 pixels
+     There are 32 pixels per row, hence row 0 is full, and row 1 is filled
+     up to 63 - 32 = 31 pixels, hence we're at column index 30.
+     Result: (0, 62) -> frame[1][30]
+    */
     if (remainder) {
         row = quotient;
         column = remainder - 1;
     }
-    /** Case B : display pixel (x, y): (0, 63) -> npixel  = 64 pixels
-     * There are 32 pixels per row, hence both row 0 and row 1 are full.
-     * The pixel of position (0, 63) is at the end of the second row of the
-     * frame.
-     * Note: Using the remainder here is not possible, as any multiple of
-     * PX_PER_TRANSACTION will give 0, which is not the column index we want.
-     * Result: (0, 63) -> frame[1][31] */
+    /*
+     Case B : display pixel (x, y): (0, 63) -> npixel  = 64 pixels
+     There are 32 pixels per row, hence both row 0 and row 1 are full.
+     The pixel of position (0, 63) is at the end of the second row of the
+     frame.
+     Note: Using the remainder here is not possible, as any multiple of
+     PX_PER_TRANSACTION will give 0, which is not the column index we want.
+     Result: (0, 63) -> frame[1][31]
+    */
     else {
         row = quotient - 1;
         column = PX_PER_TRANSACTION - 1;
     }
 
-    // Do not write if out of frame
+    // Do not write if out of the fram's range
     if ((NUM_TRANSACTIONS <= row) || (PX_PER_TRANSACTION <= column)) {
         return;
     }
@@ -91,7 +95,8 @@ uint16_t st7735s_rgb565(uint32_t rgb888)
     uint8_t blue = (uint8_t) (((rgb888 & 0xFF) * 31) / 255);
     // Compile in one code
     uint16_t rgb565 = ((red << 11) & RED) | ((green << 5) & GREEN) | (blue & BLUE);
-    /* Swap data to send MSB first (required for compatibility with ST7735S).
+    /*
+     Swap data to send MSB first (required for compatibility with ST7735S).
      See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html#transactions-with-integers-other-than-uint8-t
     */
     return SPI_SWAP_DATA_TX(rgb565, 16);
@@ -166,9 +171,11 @@ void st7735s_draw_text(text_t text)
             text.data[text_index], text.data[text_index]);
         }
         else {
-            /** Using the character ascii code (ex:65 for 'A'), get the
-             * corresponding letter sprite and iterate through each layer
-             * of the sprite */
+            /*
+             Using the character ascii code (ex:65 for 'A'), get the
+             corresponding letter sprite and iterate through each layer
+             of the sprite.
+            */
             uint8_t char_index = text.data[text_index]-FIRST_ASCII;
 
             for (int layer_index = 0; layer_index < FONT_SIZE; layer_index++) {
@@ -199,37 +206,5 @@ void st7735s_draw_sprite(sprite_t sprite)
                 write_to_frame(x + sprite.pos_x, y + sprite.pos_y, color);
             }
         }
-    }
-}
-
-
-void st7735s_build_frame(item_t *items, int nitems)
-{
-    for (int i = 0; i < nitems; i++) {
-        if ((items + i) == NULL) {
-            printf("Error: Trying to access unauthorized memory location.\n");
-            return;
-        };
-        switch (items[i].type) {
-            case BACKGROUND:
-                st7735s_fill_background(items[i].background_color);
-                break;
-            case RECTANGLE:
-                st7735s_draw_rectangle(items[i].rectangle);
-                break;
-            case CIRCLE:
-                st7735s_draw_circle(items[i].circle);
-                break;
-            case TEXT:
-                st7735s_draw_text(items[i].text);
-                break;
-            case SPRITE:
-                st7735s_draw_sprite(items[i].sprite);
-                break;
-            default:
-                printf("Error (st7735s_build_frame): Unknown item has been given as input. Please check items[] or nitems variables.\n");
-                break;
-        };
-        
     }
 }

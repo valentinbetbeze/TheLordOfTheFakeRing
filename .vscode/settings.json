@@ -25,10 +25,20 @@
         "functional": "c",
         "fonts.h": "c",
         "maps.h": "c",
-        "thelordofthefakering.h": "c",
-        "interface.h": "c",
         "sprites.h": "c",
         "map": "c",
-        "gamepad.h": "c"
+        "gamepad.h": "c",
+        "game_engine.h": "c",
+        "complex": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "variant": "c",
+        "esp_task_wdt.h": "c",
+        "task.h": "c",
+        "stdlib.h": "c",
+        "timer_group_struct.h": "c",
+        "timer_group_reg.h": "c"
     }
 }

@@ -1,6 +1,6 @@
 set (SOURCES
     "TheLordOfTheFakeRing.c"
-    "interface.c"
+    "game_engine.c"
 )
 
 set(LIB
