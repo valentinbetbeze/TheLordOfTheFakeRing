@@ -4,11 +4,6 @@
  * @brief Configuration header file
  * @date 2023-04-17
  * 
- * @note The following sections can and should be modified
- *       according to the hardware setup used:
- *          - GPIOs
- *          - Display parameters
- *          - SPI parameters
  * @warning Do not modify any value between parenthesis '()'.
  */
 
@@ -35,7 +30,7 @@
 /*************************************************
  * Display parameters
  ************************************************/
-#define LCD_MEMORY_BASE     0b11            // Discplay resolution code
+#define LCD_MEMORY_BASE     0b11            // Display resolution code
 #define LCD_COLOR_FORMAT    (0x05)          // 16-bit/pixel            
 #define LCD_RTNA            0x00
 #define LCD_FPA             0x06
@@ -119,8 +114,22 @@
  * Game design parameters
  ************************************************/
 
-#define MAX_BLOCKS_FRAME    40  /* Maximum amount of blocks on 1 frame. Can be
-                                 increased at the cost of memory */
+// All blocks > 0 are solid, else they are not.
+#define BACKGROUND_BLOCK        (0)
+#define NON_BREAKABLE_BLOCK     (1)
+#define BREAKABLE_BLOCK         (2)
+#define BONUS_BLOCK             (3)
+
+#define U8BIT(x)                (x & 0xFF)
+#define U12BIT(x)               (x & 0xFFF)
+#define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
+#define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
+#define MAP_ID(x)               (x[0][0])
+
+#define NUM_EVENTS              10
+#define INITIAL_SPEED           1
+// Timestep by which to increase the speed of a character(= Δv/a = +1/a)
+#define DELTA_T                 200
 
 
 

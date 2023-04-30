@@ -17,18 +17,6 @@
 #include "fonts.h"
 #include "sprites.h"
 
-// All blocks > 0 are solid, else they are not.
-#define BACKGROUND_BLOCK        (0)
-#define NON_BREAKABLE_BLOCK     (1)
-#define BREAKABLE_BLOCK         (2)
-#define BONUS_BLOCK             (3)
-
-#define U8BIT(x)                (x & 0xFF)
-#define U12BIT(x)               (x & 0xFFF)
-#define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
-#define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
-#define MAP_ID(x)               (x[0][0])
-#define NUM_EVENTS              10
 
 /*************************************************
  * Data structures
@@ -47,7 +35,11 @@ typedef struct {
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
     uint8_t right_collision :   1;
-    uint8_t speed;
+    uint8_t jumping :           1;
+    uint8_t accelerating :      1;
+    uint8_t speed_x;
+    uint8_t speed_y;
+    uint32_t t0;
     sprite_t sprite;
 } character_t;
 
@@ -77,14 +69,7 @@ block_state_t *get_block_state(uint16_t id);
  * character. Hence, a 'left' collision means that the sprite has a collision on its
  * left edge.
  */
-int8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *character, uint16_t map_x);
-
-/**
- * @brief 
- * 
- * @param character 
- */
-void update_position(character_t *character);
+int8_t check_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *character, uint16_t map_x);
 
 /**
  * @brief Build the frame to display at the current map location.

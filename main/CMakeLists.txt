@@ -8,6 +8,7 @@ set(LIB
     gamepad
     st7735s
     esp_rom
+    driver
 )
 
 idf_component_register(

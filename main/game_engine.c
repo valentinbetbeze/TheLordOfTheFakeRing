@@ -140,7 +140,7 @@ block_state_t *get_block_state(uint16_t id)
 }
 
 
-int8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *character, uint16_t map_x)
+int8_t check_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *character, uint16_t map_x)
 {   
     if (map == NULL) {
         printf("Error(check_block_collisions): Map file does not exist.\n");
@@ -150,8 +150,8 @@ int8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *char
         printf("Error(check_block_collisions): Character cannot be found.\n");
         return -1;
     }
-    if (character->speed * 2 >= BLOCK_SIZE) {
-        printf("Error(check_block_collisions): Speed is too high. Max speed = (BLOCK_SIZE / 2) - 1");
+    if (character->speed_x * 2 >= BLOCK_SIZE || character->speed_y * 2 >= BLOCK_SIZE) {
+        printf("Error(check_block_collisions): Speed is too high. Max speed = (BLOCK_SIZE / 2) - 1\n");
         return -1;
     }
     // Reset character collision states
@@ -163,17 +163,17 @@ int8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *char
     uint8_t x_offset = (character->sprite.pos_x + map_x) % BLOCK_SIZE;
     uint8_t y_offset = character->sprite.pos_y % BLOCK_SIZE;
     struct {
-        uint8_t left    : 1;
-        uint8_t right   : 1;
-        uint8_t top     : 1;
-        uint8_t bottom  : 1;
+        uint8_t left :      1;
+        uint8_t right :     1;
+        uint8_t top :       1;
+        uint8_t bottom :    1;
     } collision_risk = {
-        .left   = (x_offset == BLOCK_SIZE - character->speed),
-        .right  = (x_offset == character->speed),
-        .top    = (y_offset == BLOCK_SIZE - character->speed),
-        .bottom = (y_offset == character->speed),
+        .left   = ((uint8_t)BLOCK_SIZE - character->speed_x <= x_offset),
+        .right  = (1 <= x_offset && x_offset <= character->speed_x),
+        .top    = ((uint8_t)BLOCK_SIZE / 2 < y_offset && y_offset <= BLOCK_SIZE - 1),
+        .bottom = (1 <= y_offset && y_offset < (uint8_t)BLOCK_SIZE / 2),
     };
-
+    // If no collision risk, abort
     if (!collision_risk.left && !collision_risk.right && !collision_risk.top && !collision_risk.bottom) {
         return 0;
     }
@@ -201,56 +201,51 @@ int8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *char
         collisions++;
     }
     else if ((collision_risk.right && IS_SOLID(block_tr) && !is_block_destroyed(block_tr_id)) ||
-             (collision_risk.right && y_offset && IS_SOLID(block_br) && !is_block_destroyed(block_br_id) && 
+             (collision_risk.right && y_offset && IS_SOLID(block_br) && !is_block_destroyed(block_br_id) &&
              (!IS_SOLID(block_bl) || is_block_destroyed(block_bl_id)))) {
+             
         character->right_collision = 1;
         collisions++;
     }
     // Check top/bottom collision
-    if ((collision_risk.top && IS_SOLID(block_tl) && !is_block_destroyed(block_tl_id)) ||
-        (collision_risk.top &&  character->speed < x_offset &&
-         IS_SOLID(block_tr) && !is_block_destroyed(block_tr_id))) {
-            character->top_collision = 1;
-            collisions++;
-            if (x_offset <= BLOCK_SIZE / 2 && IS_SOLID(block_tl) && !is_block_destroyed(block_tl_id)) {
-                block_id = get_block_id(row_character, col_character);
-                update_block_state(block_id, block_tl, map_row);
-            }
-            else if (x_offset > BLOCK_SIZE / 2 && IS_SOLID(block_tr) && !is_block_destroyed(block_tr_id)) {
-                block_id = get_block_id(row_character + 1, col_character);
-                update_block_state(block_id, block_tr, map_row);
-            }
+    if ((collision_risk.top && IS_SOLID(block_tl) && !is_block_destroyed(block_tl_id) &&
+        x_offset < BLOCK_SIZE - character->speed_x) ||
+        (collision_risk.top &&  character->speed_x < x_offset && IS_SOLID(block_tr) &&
+        !is_block_destroyed(block_tr_id))) {
+
+        character->top_collision = 1;
+        collisions++;
+        if (x_offset <= BLOCK_SIZE / 2 && IS_SOLID(block_tl) && !is_block_destroyed(block_tl_id)) {
+            block_id = get_block_id(row_character, col_character);
+            update_block_state(block_id, block_tl, map_row);
         }
-    else if ((collision_risk.bottom && IS_SOLID(block_bl) && !is_block_destroyed(block_bl_id)) ||
-             (collision_risk.bottom && character->speed < x_offset &&
-             IS_SOLID(block_br) && !is_block_destroyed(block_tl_id))) {
+        else if (x_offset > BLOCK_SIZE / 2 && IS_SOLID(block_tr) && !is_block_destroyed(block_tr_id)) {
+            block_id = get_block_id(row_character + 1, col_character);
+            update_block_state(block_id, block_tr, map_row);
+        }
+    }
+    else if ((collision_risk.bottom && IS_SOLID(block_bl) && !is_block_destroyed(block_bl_id) &&
+            x_offset < BLOCK_SIZE - character->speed_x) || 
+            (collision_risk.bottom && character->speed_x < x_offset && IS_SOLID(block_br) &&
+            !is_block_destroyed(block_br_id))) {
         character->bottom_collision = 1;
         collisions++;
     }
-    return collisions;
-}
-
-
-void update_position(character_t *character)
-{
-    if (character == NULL) {
-        printf("Error(update_position): Character cannot be found.\n");
-        return;
-    }
-    // Correct x-position
+    // Apply collision's reactive force
     if (character->left_collision) {
-        character->sprite.pos_x += character->speed;
+        character->sprite.pos_x += BLOCK_SIZE - x_offset;
     }
     else if (character->right_collision) {
-        character->sprite.pos_x -= character->speed;
+        character->sprite.pos_x -= x_offset;
     }
-    // Correct y-position
     if (character->top_collision) {
-        character->sprite.pos_y += character->speed;
+        character->sprite.pos_y += BLOCK_SIZE - y_offset;
     }
     else if (character->bottom_collision) {
-        character->sprite.pos_y -= character->speed;
+        character->sprite.pos_y -= y_offset;
     }
+
+    return collisions;
 }
 
 
