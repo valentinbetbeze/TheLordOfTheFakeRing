@@ -115,7 +115,7 @@ void app_main()
         uint64_t time;
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &time));
         time = (uint64_t)time / 10; // Convert to milliseconds
-        
+
         // Update the player's x-position
         int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
         player.sprite.pos_x += player.speed_x * (int16_t)(x / 100);
@@ -127,33 +127,50 @@ void app_main()
             player.sprite.pos_x = 0;
         }
 
-        // Check if starting or ending a jump
-        if ((!player.jumping && gamepad_poll_button(&button_C)) ||
-            (!player.jumping && !player.bottom_collision)) {
-
+        // Check if the player is falling or jumping
+        if (player.falling && player.bottom_collision) {
+            player.falling = 0;
+            player.speed_y = INITIAL_SPEED;
+        }
+        else if ((player.bottom_collision || player.left_collision || player.right_collision) && gamepad_poll_button(&button_C)) {
             player.t0 = (uint32_t)time;
             player.jumping = 1;
+            player.falling = 0;
+            player.speed_y = JUMP_INIT_SPEED;
         }
-        else if (player.jumping && player.bottom_collision) {
+        else if ((player.jumping && player.top_collision) ||
+                (player.jumping && player.speed_y == 0)) {
             player.jumping = 0;
+            player.falling = 1;
             player.speed_y = INITIAL_SPEED;
+        }
+        else if (!player.jumping && !player.falling && !player.bottom_collision) {
+            player.falling = 1;
         }
 
         // Update the player's y-position
         player.accelerating = (uint8_t)(((uint32_t)time - player.t0) / DELTA_T);
-        if (player.jumping && player.accelerating) {
-            player.t0 = (uint32_t)time;
-            player.accelerating = 0;
-            player.speed_y += 1;
-            printf("speed: %i\n", player.speed_y);
+        if (!player.jumping) {
+            if (player.falling && player.accelerating) {
+                player.t0 = (uint32_t)time;
+                player.accelerating = 0;
+                player.speed_y += 1;
+            }
+            player.sprite.pos_y += player.speed_y;
         }
-        player.sprite.pos_y += player.speed_y;
+        else {
+            if (player.accelerating) {
+                player.t0 = (uint32_t)time;
+                player.accelerating = 0;
+                player.speed_y -= 1;
+            }
+            player.sprite.pos_y -= player.speed_y;
+        }
 
         // Check for collisions with the environment, and update the player's position if required
         if (-1 == check_collisions(map, &player, map_x)) {
             break;
         }
-
         // Build and display the frame
         build_frame(map, map_x);
         st7735s_draw_sprite(player.sprite);

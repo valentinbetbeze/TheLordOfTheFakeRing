@@ -130,6 +130,7 @@
 #define INITIAL_SPEED           1
 // Timestep by which to increase the speed of a character(= Δv/a = +1/a)
 #define DELTA_T                 200
+#define JUMP_INIT_SPEED         2
 
 
 

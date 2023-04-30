@@ -35,6 +35,7 @@ typedef struct {
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
     uint8_t right_collision :   1;
+    uint8_t falling :           1;
     uint8_t jumping :           1;
     uint8_t accelerating :      1;
     uint8_t speed_x;
