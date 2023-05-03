@@ -39,6 +39,9 @@
         "task.h": "c",
         "stdlib.h": "c",
         "timer_group_struct.h": "c",
-        "timer_group_reg.h": "c"
+        "timer_group_reg.h": "c",
+        "thread": "c",
+        "bitset": "c",
+        "algorithm": "c"
     }
 }

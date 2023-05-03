@@ -23,14 +23,14 @@
  *************************************************/
 
 typedef struct {
-    uint16_t id :           12;
-    uint8_t hit :           1;
-    uint8_t destroyed :     1;
-    uint8_t has_item :      1;
-} block_state_t;
+    uint8_t destroyed :         1;
+    uint8_t has_item :          1;
+    uint8_t bumping :           1;
+    int16_t row;
+    int8_t column;
+} block_t;
 
 typedef struct {
-    uint8_t life :              4;    
     uint8_t top_collision :     1;
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
@@ -38,9 +38,30 @@ typedef struct {
     uint8_t falling :           1;
     uint8_t jumping :           1;
     uint8_t accelerating :      1;
+    uint8_t free_flag :         1;
+    int16_t pos_x;
+    int16_t pos_y;
     uint8_t speed_x;
     uint8_t speed_y;
-    uint32_t t0;
+} physics_t;
+
+typedef struct {
+    uint8_t life :              1;
+    uint8_t spawned :           1;
+    int16_t row;
+    int8_t column;
+    uint32_t timer;
+    physics_t physics;
+} enemy_t;
+
+typedef struct {
+    uint8_t life :              4;
+    uint8_t shield :            1;
+    uint8_t firestaff :         1;
+    uint8_t mount :             1;
+    uint8_t free_flag :         1;
+    uint32_t timer;
+    physics_t physics;
     sprite_t sprite;
 } character_t;
 
@@ -49,40 +70,27 @@ typedef struct {
  * Prototypes
  *************************************************/
 
-/**
- * @brief Get the block state object
- * 
- * @param id 
- * @return block_state_t* 
- */
-block_state_t *get_block_state(uint16_t id);
+
+uint8_t enter_block_record(block_t block, uint16_t map_row);
+
+
+block_t *get_block_record(int16_t row, int8_t column);
 
 /**
  * @brief Check  collisions between the character and environment blocks.
  * 
  * @param[in] map Game map the character is in.
- * @param[in] character Pointer to the character to check for collisions.
+ * @param[in] physics Pointer to the physical data of the reference element.
  * @param[in] map_x Position of the current frame (x-axis), in pixels.
  * 
- * @return -1 if error, else the number of collisions.
+ * @return 0 on success, 1 on failure
  * 
  * @warning The position of the collision is taken from the reference of the given
- * character. Hence, a 'left' collision means that the sprite has a collision on its
- * left edge.
+ * physical object. Hence, a 'left' collision means that the object has a collision on its
+ * left side.
  */
-int8_t check_collisions(const int8_t map[][NB_BLOCKS_Y], character_t *character, uint16_t map_x);
+uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physics, uint16_t map_x);
 
-/**
- * @brief Build the frame to display at the current map location.
- * 
- * @param[in] map Game map the character is in.
- * @param[in] map_x Position of the current frame (x-axis), in pixels.
- * @return 1 if error; 0 if success
- * 
- * @warning This function only draws the static elements of the map (blocks).
- * Any interactive element (characters, text, etc), must be drawn seperately.
- */
-uint8_t build_frame(const int8_t map[][NB_BLOCKS_Y], uint16_t map_x);
-
+void bump(block_t *block, sprite_t *sprite, uint64_t timer);
 
 #endif // __GAME_ENGINE_H__

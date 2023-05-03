@@ -96,13 +96,13 @@ void app_main()
     uint16_t map_x = 0;
     character_t player = {
         .life               = 3,
-        .speed_x            = INITIAL_SPEED,
-        .speed_y            = INITIAL_SPEED,
+        .physics.pos_x      = 16,
+        .physics.pos_y      = 0,
+        .physics.speed_x    = INITIAL_SPEED,
+        .physics.speed_y    = INITIAL_SPEED,
         .sprite.height      = BLOCK_SIZE,
         .sprite.width       = BLOCK_SIZE,
-        .sprite.data        = sprite_player,
-        .sprite.pos_x       = 16,
-        .sprite.pos_y       = 0,
+        .sprite.data        = sprite_player
     };
 
     while(1) {
@@ -112,67 +112,133 @@ void app_main()
         TIMERG0.wdtwprotect.wdt_wkey = 0;
 
         // Get the time for the current iteration
-        uint64_t time;
-        ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &time));
-        time = (uint64_t)time / 10; // Convert to milliseconds
+        uint64_t timer;
+        ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &timer));
+        timer = (uint64_t)timer / 10; // Convert to milliseconds
 
         // Update the player's x-position
         int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
-        player.sprite.pos_x += player.speed_x * (int16_t)(x / 100);
-        if (player.sprite.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
-            map_x += player.speed_x;
-            player.sprite.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
+        player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
+        if (player.physics.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+            map_x += player.physics.speed_x;
+            player.physics.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
         }
-        else if (player.sprite.pos_x < 0) {
-            player.sprite.pos_x = 0;
+        else if (player.physics.pos_x < 0) {
+            player.physics.pos_x = 0;
         }
 
         // Check if the player is falling or jumping
-        if (player.falling && player.bottom_collision) {
-            player.falling = 0;
-            player.speed_y = INITIAL_SPEED;
+        if (player.physics.falling && player.physics.bottom_collision) {
+            player.physics.falling = 0;
+            player.physics.speed_y = INITIAL_SPEED;
         }
-        else if ((player.bottom_collision || player.left_collision || player.right_collision) && gamepad_poll_button(&button_C)) {
-            player.t0 = (uint32_t)time;
-            player.jumping = 1;
-            player.falling = 0;
-            player.speed_y = JUMP_INIT_SPEED;
+        else if ((player.physics.bottom_collision || player.physics.left_collision ||
+                 player.physics.right_collision) && gamepad_poll_button(&button_C)) {
+            player.timer = (uint32_t)timer;
+            player.physics.jumping = 1;
+            player.physics.falling = 0;
+            player.physics.speed_y = JUMP_INIT_SPEED;
         }
-        else if ((player.jumping && player.top_collision) ||
-                (player.jumping && player.speed_y == 0)) {
-            player.jumping = 0;
-            player.falling = 1;
-            player.speed_y = INITIAL_SPEED;
+        else if ((player.physics.jumping && player.physics.top_collision) ||
+                (player.physics.jumping && player.physics.speed_y == 0)) {
+            player.physics.jumping = 0;
+            player.physics.falling = 1;
+            player.physics.speed_y = 0;
         }
-        else if (!player.jumping && !player.falling && !player.bottom_collision) {
-            player.falling = 1;
+        else if (!player.physics.jumping &&
+                 !player.physics.falling &&
+                 !player.physics.bottom_collision) {
+            player.physics.falling = 1;
         }
 
         // Update the player's y-position
-        player.accelerating = (uint8_t)(((uint32_t)time - player.t0) / DELTA_T);
-        if (!player.jumping) {
-            if (player.falling && player.accelerating) {
-                player.t0 = (uint32_t)time;
-                player.accelerating = 0;
-                player.speed_y += 1;
+        player.physics.accelerating = (uint8_t)(((uint32_t)timer - player.timer) / TIMESTEP_SPEED);
+        if (!player.physics.jumping) {
+            if (player.physics.falling && player.physics.accelerating) {
+                player.timer = (uint32_t)timer;
+                player.physics.accelerating = 0;
+                player.physics.speed_y++;
             }
-            player.sprite.pos_y += player.speed_y;
+            player.physics.pos_y += player.physics.speed_y;
         }
         else {
-            if (player.accelerating) {
-                player.t0 = (uint32_t)time;
-                player.accelerating = 0;
-                player.speed_y -= 1;
+            if (player.physics.accelerating) {
+                player.timer = (uint32_t)timer;
+                player.physics.accelerating = 0;
+                player.physics.speed_y--;
             }
-            player.sprite.pos_y -= player.speed_y;
+            player.physics.pos_y -= player.physics.speed_y;
         }
 
         // Check for collisions with the environment, and update the player's position if required
-        if (-1 == check_collisions(map, &player, map_x)) {
+        if (check_block_collisions(map, &player.physics, map_x)) {
             break;
         }
-        // Build and display the frame
-        build_frame(map, map_x);
+
+        /*************************************************
+         * Build and display the frame
+         *************************************************/
+        
+        st7735s_fill_background(MAP_BACKGROUND(map));
+        // Iterate through each element of the current map frame
+        uint16_t map_row = (uint16_t)(map_x / BLOCK_SIZE) + 1;
+        for (int i = map_row; i <= map_row + NB_BLOCKS_X; i++) {
+            for (int j = 0; j < NB_BLOCKS_Y; j++) {
+                int8_t element_type = map[i][NB_BLOCKS_Y - j - 1];
+                if (element_type == BACKGROUND_BLOCK) {
+                    continue;
+                }
+                block_t *block = get_block_record(i, NB_BLOCKS_Y - j - 1);
+                if (block != NULL && block->destroyed) {
+                    continue;
+                }
+                // Draw the element
+                uint8_t map_id = MAP_ID(map);
+                sprite_t sprite = {
+                    .height = BLOCK_SIZE,
+                    .width = BLOCK_SIZE,
+                };
+                switch (element_type) {
+                    case NON_BREAKABLE_BLOCK:
+                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
+                        sprite.pos_y = j * BLOCK_SIZE;
+                        switch (map_id) {
+                            case 1: sprite.data = shire_block_1; break;
+                            case 2: sprite.data = moria_block_1; break;
+                            default: break;
+                        }
+                        break;
+                    case BREAKABLE_BLOCK:
+                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
+                        sprite.pos_y = j * BLOCK_SIZE;
+                        switch (map_id) {
+                            case 1: sprite.data = shire_block_2; break;
+                            case 2: sprite.data = moria_block_2; break;
+                            default: break;
+                        }
+                        break;
+                    case BONUS_BLOCK:
+                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
+                        sprite.pos_y = j * BLOCK_SIZE;
+                        if (block != NULL && block->bumping) {
+                            bump(block, &sprite, timer);
+                        }
+                        switch (map_id) {
+                            case 1: sprite.data = shire_block_3; break;
+                            case 2: sprite.data = moria_block_3; break;
+                            default: break;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (sprite.data != NULL) {
+                    st7735s_draw_sprite(sprite);
+                }
+            }
+        }
+        player.sprite.pos_x = player.physics.pos_x;
+        player.sprite.pos_y = player.physics.pos_y;
         st7735s_draw_sprite(player.sprite);
         st7735s_push_frame(tft_handle);
     }

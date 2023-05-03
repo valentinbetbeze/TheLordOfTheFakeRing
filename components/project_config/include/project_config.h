@@ -120,17 +120,22 @@
 #define BREAKABLE_BLOCK         (2)
 #define BONUS_BLOCK             (3)
 
-#define U8BIT(x)                (x & 0xFF)
-#define U12BIT(x)               (x & 0xFFF)
+#define ENEMY_1                 ('A')
+#define ENEMY_2                 ('B')
+#define ENEMY_3                 ('C')
+
 #define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
+#define IS_INTERACTIVE(x)       (x > NON_BREAKABLE_BLOCK)
 #define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
 #define MAP_ID(x)               (x[0][0])
 
-#define NUM_EVENTS              10
+#define NUM_BLOCK_RECORDS       10
+#define NUM_ENEMIES_RECORDS     10
 #define INITIAL_SPEED           1
-// Timestep by which to increase the speed of a character(= Δv/a = +1/a)
-#define DELTA_T                 200
 #define JUMP_INIT_SPEED         2
+#define TIMESTEP_SPEED          200
+#define TIMESTEP_BUMP           60
+#define BUMP_HEIGHT             3
 
 
 
