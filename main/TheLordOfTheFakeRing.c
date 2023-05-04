@@ -91,9 +91,11 @@ void app_main()
      * Program body
      *************************************************/
 
-    const int8_t (*map)[NB_BLOCKS_Y] = shire;
-
-    uint16_t map_x = 0;
+    const int8_t (*map)[NUM_BLOCKS_Y] = shire;
+    uint8_t map_id = MAP_ID(map);
+    uint16_t map_x = 0;     // Left position of the current map frame, in pixels
+    uint16_t map_row = 1;   // First row of the current map frame
+    uint8_t camera_moving = 0;
     character_t player = {
         .life               = 3,
         .physics.pos_x      = 16,
@@ -105,23 +107,24 @@ void app_main()
         .sprite.data        = sprite_player
     };
 
-    while(1) {
-        // Feed the task watchdog timer
-        TIMERG0.wdtwprotect.wdt_wkey = TIMG_WDT_WKEY_VALUE;
-        TIMERG0.wdtfeed.wdt_feed = 1;
-        TIMERG0.wdtwprotect.wdt_wkey = 0;
+    // Create the enemies appearing in the very first frame of the map
+    spawn_enemies(map, 1, NUM_BLOCKS_X + 1, map_row);
 
+    while(1) {
         // Get the time for the current iteration
         uint64_t timer;
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &timer));
         timer = (uint64_t)timer / 10; // Convert to milliseconds
 
+        camera_moving = 0;
         // Update the player's x-position
         int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
         player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
         if (player.physics.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
-            map_x += player.physics.speed_x;
+            map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixel
+            map_row = (uint16_t)(map_x / BLOCK_SIZE) + 1;
             player.physics.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
+            camera_moving = 1;
         }
         else if (player.physics.pos_x < 0) {
             player.physics.pos_x = 0;
@@ -152,7 +155,7 @@ void app_main()
         }
 
         // Update the player's y-position
-        player.physics.accelerating = (uint8_t)(((uint32_t)timer - player.timer) / TIMESTEP_SPEED);
+        player.physics.accelerating = (timer - player.timer) / TIMESTEP_ACCEL;
         if (!player.physics.jumping) {
             if (player.physics.falling && player.physics.accelerating) {
                 player.timer = (uint32_t)timer;
@@ -170,38 +173,87 @@ void app_main()
             player.physics.pos_y -= player.physics.speed_y;
         }
 
-        // Check for collisions with the environment, and update the player's position if required
-        if (check_block_collisions(map, &player.physics, map_x)) {
-            break;
-        }
 
         /*************************************************
-         * Build and display the frame
+         * Enemies
          *************************************************/
+        // Check the next 4 rows for enemies to spawn
+        spawn_enemies(map, map_row + NUM_BLOCKS_X, map_row + NUM_BLOCKS_X + 3, map_row);
+        // Apply dynamics to each living enemy
+        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
+            if (enemies[i].life == 0 || enemies[i].physics.pos_x < -BLOCK_SIZE) {
+                continue;
+            }
+            // Check if falling
+            if (!enemies[i].physics.bottom_collision) {
+                enemies[i].physics.falling = 1;
+            }
+            else if (enemies[i].physics.falling && enemies[i].physics.bottom_collision) {
+                enemies[i].physics.falling = 0;
+                enemies[i].physics.speed_y = INITIAL_SPEED;
+            }
+            // Update x-position
+            if (camera_moving) {
+                enemies[i].physics.pos_x -= 2 * enemies[i].physics.speed_x;
+                enemies[i].timer_x = (uint32_t)timer;
+            }
+            else if ((timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) {
+                enemies[i].physics.pos_x -= enemies[i].physics.speed_x;
+                enemies[i].timer_x = (uint32_t)timer;
+            }
+            // Update y-position
+            enemies[i].physics.accelerating = (timer - enemies[i].timer_y) / TIMESTEP_ACCEL;
+            if (enemies[i].physics.falling && enemies[i].physics.accelerating) {
+                enemies[i].physics.accelerating = 0;
+                enemies[i].physics.speed_y++;
+                enemies[i].timer_y = (uint32_t)timer;
+            }
+            enemies[i].physics.pos_y += enemies[i].physics.speed_y;
+        }
+
+
+        /*************************************************
+         * Collision checks
+         *************************************************/
+        if (check_block_collisions(map, &player.physics, map_x)) {
+            return;
+        }
         
+        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
+            if (enemies[i].life == 0) {
+                break;
+            }
+            if (check_block_collisions(map, &enemies[i].physics, map_x)) {
+                return;
+            }
+        }
+
+
+        /*************************************************
+         * Frame construction and display
+         *************************************************/
         st7735s_fill_background(MAP_BACKGROUND(map));
-        // Iterate through each element of the current map frame
-        uint16_t map_row = (uint16_t)(map_x / BLOCK_SIZE) + 1;
-        for (int i = map_row; i <= map_row + NB_BLOCKS_X; i++) {
-            for (int j = 0; j < NB_BLOCKS_Y; j++) {
-                int8_t element_type = map[i][NB_BLOCKS_Y - j - 1];
+
+        // Draw the current frame of the map
+        for (uint8_t row = map_row; row <= map_row + NUM_BLOCKS_X; row++) {
+            for (int column = 0; column < NUM_BLOCKS_Y; column++) {
+                int8_t element_type = map[row][NUM_BLOCKS_Y - 1 - column];
                 if (element_type == BACKGROUND_BLOCK) {
                     continue;
                 }
-                block_t *block = get_block_record(i, NB_BLOCKS_Y - j - 1);
+                block_t *block = get_block_record(row, NUM_BLOCKS_Y - 1 - column);
                 if (block != NULL && block->destroyed) {
                     continue;
                 }
                 // Draw the element
-                uint8_t map_id = MAP_ID(map);
                 sprite_t sprite = {
                     .height = BLOCK_SIZE,
                     .width = BLOCK_SIZE,
+                    .pos_x = (row - 1) * BLOCK_SIZE - map_x,
+                    .pos_y = column * BLOCK_SIZE
                 };
                 switch (element_type) {
                     case NON_BREAKABLE_BLOCK:
-                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
-                        sprite.pos_y = j * BLOCK_SIZE;
                         switch (map_id) {
                             case 1: sprite.data = shire_block_1; break;
                             case 2: sprite.data = moria_block_1; break;
@@ -209,8 +261,6 @@ void app_main()
                         }
                         break;
                     case BREAKABLE_BLOCK:
-                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
-                        sprite.pos_y = j * BLOCK_SIZE;
                         switch (map_id) {
                             case 1: sprite.data = shire_block_2; break;
                             case 2: sprite.data = moria_block_2; break;
@@ -218,8 +268,6 @@ void app_main()
                         }
                         break;
                     case BONUS_BLOCK:
-                        sprite.pos_x = (i - 1) * BLOCK_SIZE - map_x;
-                        sprite.pos_y = j * BLOCK_SIZE;
                         if (block != NULL && block->bumping) {
                             bump(block, &sprite, timer);
                         }
@@ -237,9 +285,49 @@ void app_main()
                 }
             }
         }
+
+        // Draw the enemies (if any)
+        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
+            if (enemies[i].life == 0) {
+                break;
+            }
+            sprite_t sprite = {
+                .height = BLOCK_SIZE,
+                .width = BLOCK_SIZE,
+                .pos_x = enemies[i].physics.pos_x,
+                .pos_y = enemies[i].physics.pos_y
+            };
+            switch(map[enemies[i].row][enemies[i].column]) {
+                case ENEMY_1:
+                    switch (map_id) {
+                        case 1: sprite.data = shire_enemy_1; break;
+                        default: break;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            if (sprite.data != NULL) {
+                st7735s_draw_sprite(sprite);
+            }
+        }
+
+        // Finally, draw the player
         player.sprite.pos_x = player.physics.pos_x;
         player.sprite.pos_y = player.physics.pos_y;
         st7735s_draw_sprite(player.sprite);
+
         st7735s_push_frame(tft_handle);
+
+
+        /*************************************************
+         * Music
+         *************************************************/
+
+
+        // Feed the task watchdog timer
+        TIMERG0.wdtwprotect.wdt_wkey = TIMG_WDT_WKEY_VALUE;
+        TIMERG0.wdtfeed.wdt_feed = 1;
+        TIMERG0.wdtwprotect.wdt_wkey = 0;
     }
 }

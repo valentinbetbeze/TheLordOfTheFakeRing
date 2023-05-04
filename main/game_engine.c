@@ -1,13 +1,13 @@
 #include "game_engine.h"
 
 static block_t blocks[NUM_BLOCK_RECORDS];
-static enemy_t enemies[NUM_ENEMIES_RECORDS];
+enemy_t enemies[NUM_ENEMY_RECORDS] = {0};
 
 
 static uint8_t set_block_flags_on_hit(block_t *block, int8_t block_type)
 {
     if (block == NULL) {
-        printf("Error(change_block_state): Empty block_t pointer.\n");
+        printf("Error(set_block_flags_on_hit): Empty block_t pointer.\n");
         return 1;
     }
     switch (block_type) {
@@ -22,7 +22,7 @@ static uint8_t set_block_flags_on_hit(block_t *block, int8_t block_type)
             block->bumping      = 1;
             break;
         default:
-            printf("Warning(change_block_state): You're trying to change the state of a block that cannot interact with external events.\n");
+            printf("Warning(set_block_flags_on_hit): You're trying to change the state of a block that cannot interact with external events. Block type: %i\n", block_type);
             break;
     }
     return 0;
@@ -39,18 +39,7 @@ static uint8_t is_block_destroyed(int16_t row, int8_t column)
 }
 
 
-block_t *get_block_record(int16_t row, int8_t column)
-{
-    for (int8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
-        if (blocks[i].row == row && blocks[i].column == column) {
-            return &blocks[i];
-        }
-    }
-    return NULL; // Block not found
-}
-
-
-uint8_t enter_block_record(block_t block, uint16_t map_row)
+uint8_t create_block_record(block_t block, uint16_t map_row)
 {
     // Initialize the blocks array the first time only
     static uint8_t bloc_record_initialized = 0;
@@ -64,13 +53,12 @@ uint8_t enter_block_record(block_t block, uint16_t map_row)
         }
         bloc_record_initialized = 1;
     }
-    // Scan the block_record to find or create the state record of the block
+    // Scan the blocks log to create the state record of the block
     int8_t index = -1;
     uint8_t free_slot_found = 0;
     for (int8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
         if (blocks[i].row == block.row && blocks[i].column == block.column) {
-            index = i;
-            break;
+            return 1; // Record already exists
         }
         else if (!free_slot_found && blocks[i].row == -1 && blocks[i].column == -1) {
             index = i;
@@ -78,23 +66,31 @@ uint8_t enter_block_record(block_t block, uint16_t map_row)
         }
         // If the block is not in the frame anymore, clean the slot and write over it
         else if (!free_slot_found && block.row < map_row) {
+            memset(&blocks[index], 0, sizeof(blocks[index]));
             index = i;
         }
     }
     if (index == -1) {
-        printf("Error(update_block_state): Cannot add new event (block_record full).\n");
-        return 1;
+        printf("Error(create_block_record): Cannot add new record (blocks[] full).\n");
+        return 2;
     }
-    blocks[index].row          = block.row;
-    blocks[index].column       = block.column;
-    blocks[index].destroyed    = block.destroyed;
-    blocks[index].has_item     = block.has_item;
-    blocks[index].bumping      = block.bumping;
+    blocks[index] = block;
     return 0;
 }
 
 
-uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physics, uint16_t map_x)
+block_t *get_block_record(int16_t row, int8_t column)
+{
+    for (int8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
+        if (blocks[i].row == row && blocks[i].column == column) {
+            return &blocks[i];
+        }
+    }
+    return NULL; // Block not found
+}
+
+
+uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *physics, uint16_t map_x)
 {   
     if (map == NULL) {
         printf("Error(check_block_collisions): Map file does not exist.characterobjec\n");
@@ -134,7 +130,7 @@ uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physi
     // Compute reference parameters
     uint16_t map_row = (uint16_t)(map_x / BLOCK_SIZE) + 1;
     int16_t ref_row = (int16_t)(physics->pos_x + map_x) / BLOCK_SIZE + 1;
-    int8_t ref_col = NB_BLOCKS_Y - (int8_t)(physics->pos_y / BLOCK_SIZE) - 1;
+    int8_t ref_col = NUM_BLOCKS_Y - (int8_t)(physics->pos_y / BLOCK_SIZE) - 1;
     // Get all 4 adjacent block types
     int8_t block_tl = map[ref_row][ref_col];           // top-left block
     int8_t block_tr = map[ref_row + 1][ref_col];       // top-right block
@@ -188,7 +184,15 @@ uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physi
                 .column = ref_col
             };
             set_block_flags_on_hit(&block, block_tl);
-            if (enter_block_record(block, map_row)) {
+            uint8_t err = create_block_record(block, map_row);
+            if (err == 1) {
+                block_t *record = get_block_record(ref_row, ref_col);
+                *record = block;
+                // TODO: modifying blockstates should be more modular. I have only
+                // 1 function here to do it. Must be changed for object features.
+                // TODO: Think about splitting this function if possible.
+            }
+            else if (err == 2) {
                 return 1;
             }
         }
@@ -199,9 +203,14 @@ uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physi
                 .column = ref_col
             };
             set_block_flags_on_hit(&block, block_tr);
-            if (enter_block_record(block, map_row)) {
+            uint8_t err = create_block_record(block, map_row);
+            if (err == 1) {
+                block_t *record = get_block_record(ref_row + 1, ref_col);
+                *record = block;
+            }
+            else if (err == 2) {
                 return 1;
-            }   
+            } 
         }
         physics->top_collision = 1;
         physics->pos_y += BLOCK_SIZE - y_offset;
@@ -243,4 +252,79 @@ void bump(block_t *block, sprite_t *sprite, uint64_t timer)
         steps = 0;
     }
     t0 = timer;
+}
+
+
+void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_row)
+{
+    enemy->row                      = row;
+    enemy->column                   = column;
+    enemy->life                     = 1;
+    enemy->timer_x                  = 0;
+    enemy->timer_y                  = 0;
+    enemy->physics.top_collision    = 0;
+    enemy->physics.bottom_collision = 0;
+    enemy->physics.left_collision   = 0;
+    enemy->physics.right_collision  = 0;
+    enemy->physics.accelerating     = 0;
+    enemy->physics.falling          = 0;
+    enemy->physics.jumping          = 0;
+    enemy->physics.pos_x            = BLOCK_SIZE * (row - map_row);
+    enemy->physics.pos_y            = BLOCK_SIZE * (NUM_BLOCKS_Y - 1 - column);
+    enemy->physics.speed_x          = INITIAL_SPEED;
+    enemy->physics.speed_y          = INITIAL_SPEED;
+}
+
+
+uint8_t create_enemy_record(enemy_t enemy)
+{
+    // Scan the enemy log to create the state record of an enemy
+    int8_t index = -1;
+    uint8_t free_slot_found = 0;
+    for (int8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
+        if (enemies[i].row == enemy.row && enemies[i].column == enemy.column) {
+            return 1; // Enemy record already exists
+        }
+        else if (!free_slot_found && enemies[i].life == 0) {
+            index = i;
+            free_slot_found = 1;
+        }
+        // If the enemy is not in the frame anymore, clean the slot and write over it
+        else if (!free_slot_found && enemies[i].physics.pos_x < -BLOCK_SIZE) {
+            index = i;
+        }
+    }
+    if (index == -1) {
+        printf("Error(update_enemy_state): Cannot add new enemy (enemies[] full).\n");
+        return 2;
+    }
+    memset(&enemies[index], 0, sizeof(enemies[index]));
+    enemies[index] = enemy;
+    return 0;
+}
+
+
+enemy_t *get_enemy_record(int16_t row, int8_t column)
+{
+    for (int8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
+        if (enemies[i].row == row && enemies[i].column == column) {
+            return &enemies[i];
+        }
+    }
+    return NULL; // Enemy not found
+}
+
+
+void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t end_row, uint16_t map_row)
+{
+    for (uint8_t row = start_row; row < end_row + 1; row++) {
+        for (int column = 0; column < NUM_BLOCKS_Y; column++) {
+            if (!IS_ENEMY(map[row][column])) {
+                continue;
+            }
+            enemy_t enemy;
+            initialize_enemy(&enemy, row, column, map_row);
+            create_enemy_record(enemy);
+        }
+    }
 }

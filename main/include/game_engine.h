@@ -10,13 +10,13 @@
 #ifndef __GAME_ENGINE_H__
 #define __GAME_ENGINE_H__
 
+#include <string.h>
 
 #include "project_config.h"
 #include "st7735s_graphics.h"
 #include "maps.h"
 #include "fonts.h"
 #include "sprites.h"
-
 
 /*************************************************
  * Data structures
@@ -47,10 +47,10 @@ typedef struct {
 
 typedef struct {
     uint8_t life :              1;
-    uint8_t spawned :           1;
     int16_t row;
     int8_t column;
-    uint32_t timer;
+    uint32_t timer_x;
+    uint32_t timer_y;
     physics_t physics;
 } enemy_t;
 
@@ -70,9 +70,9 @@ typedef struct {
  * Prototypes
  *************************************************/
 
+extern enemy_t enemies[NUM_ENEMY_RECORDS];
 
-uint8_t enter_block_record(block_t block, uint16_t map_row);
-
+uint8_t create_block_record(block_t block, uint16_t map_row);
 
 block_t *get_block_record(int16_t row, int8_t column);
 
@@ -89,8 +89,17 @@ block_t *get_block_record(int16_t row, int8_t column);
  * physical object. Hence, a 'left' collision means that the object has a collision on its
  * left side.
  */
-uint8_t check_block_collisions(const int8_t map[][NB_BLOCKS_Y], physics_t *physics, uint16_t map_x);
+uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *physics, uint16_t map_x);
 
 void bump(block_t *block, sprite_t *sprite, uint64_t timer);
+
+void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_row);
+
+uint8_t create_enemy_record(enemy_t enemy);
+
+enemy_t *get_enemy_record(int16_t row, int8_t column);
+
+void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t end_row, uint16_t map_row);
+
 
 #endif // __GAME_ENGINE_H__

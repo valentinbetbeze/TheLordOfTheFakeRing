@@ -120,21 +120,23 @@
 #define BREAKABLE_BLOCK         (2)
 #define BONUS_BLOCK             (3)
 
-#define ENEMY_1                 ('A')
-#define ENEMY_2                 ('B')
-#define ENEMY_3                 ('C')
+#define ENEMY_1                 (-30)
+#define ENEMY_2                 (-31)
+#define ENEMY_3                 (-32)
 
 #define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
 #define IS_INTERACTIVE(x)       (x > NON_BREAKABLE_BLOCK)
+#define IS_ENEMY(x)             (x <= ENEMY_1)
 #define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
 #define MAP_ID(x)               (x[0][0])
 
 #define NUM_BLOCK_RECORDS       10
-#define NUM_ENEMIES_RECORDS     10
+#define NUM_ENEMY_RECORDS       10
 #define INITIAL_SPEED           1
 #define JUMP_INIT_SPEED         2
-#define TIMESTEP_SPEED          200
+#define TIMESTEP_ACCEL          200
 #define TIMESTEP_BUMP           60
+#define TIMESTEP_ENEMY          10
 #define BUMP_HEIGHT             3
 
 

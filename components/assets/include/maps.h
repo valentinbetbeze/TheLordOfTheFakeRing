@@ -19,14 +19,14 @@
  * and is square.
  */
 #define BLOCK_SIZE          (16)       /* Block size in pixel            */
-#define NB_BLOCKS_X         (10)       /* Number of blocks on the x-axis */
-#define NB_BLOCKS_Y         (8)        /* Number of blocks on the y-axis */
+#define NUM_BLOCKS_X        (10)       /* Number of blocks on the x-axis */
+#define NUM_BLOCKS_Y        (8)        /* Number of blocks on the y-axis */
 
 
 /*************************************************
  * Maps
  *************************************************/
-extern const int8_t shire[][NB_BLOCKS_Y];  /* Map of the first world: The Shire */
+extern const int8_t shire[][NUM_BLOCKS_Y];  /* Map of the first world: The Shire */
 
 
 #endif // __MAPS_H__
