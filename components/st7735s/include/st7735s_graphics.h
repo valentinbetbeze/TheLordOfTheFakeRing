@@ -79,13 +79,15 @@ typedef struct {
     uint8_t pos_y;          // Top-left y-position    
     uint16_t color;         // 16-bit format          
     uint8_t size;           // Text size in bytes     
-    uint8_t *data;          // Ptr to char array      
+    const char *data;    // Ptr to char array      
 } text_t;
 
 /**
  * @brief Sprite object to be displayed onto the frame.
  */
 typedef struct {
+    uint8_t flip_x : 1;     // Flip sprite on x-axis
+    uint8_t flip_y : 1;     // Flip sprite on y-axis
     int16_t pos_x;          // Top-left x-position    
     int16_t pos_y;          // Top-left y-position    
     uint8_t height;         // Width in pixels        

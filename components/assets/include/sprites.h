@@ -29,6 +29,8 @@ extern const uint16_t moria_block_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t moria_block_2[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t moria_block_3[BLOCK_SIZE*BLOCK_SIZE];
 
-
+extern const uint16_t coin_sprite_1[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t coin_sprite_2[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t coin_sprite_3[BLOCK_SIZE*BLOCK_SIZE];
 
 #endif // __SPRITES_H__

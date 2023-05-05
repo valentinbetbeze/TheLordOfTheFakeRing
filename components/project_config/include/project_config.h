@@ -124,6 +124,10 @@
 #define ENEMY_2                 (-31)
 #define ENEMY_3                 (-32)
 
+#define GOLD                    (1)
+#define FIRESTAFF               (2)
+#define SHIELD                  (3)
+
 #define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
 #define IS_INTERACTIVE(x)       (x > NON_BREAKABLE_BLOCK)
 #define IS_ENEMY(x)             (x <= ENEMY_1)
@@ -132,12 +136,17 @@
 
 #define NUM_BLOCK_RECORDS       10
 #define NUM_ENEMY_RECORDS       10
-#define INITIAL_SPEED           1
-#define JUMP_INIT_SPEED         2
-#define TIMESTEP_ACCEL          200
-#define TIMESTEP_BUMP           60
-#define TIMESTEP_ENEMY          10
-#define BUMP_HEIGHT             3
+#define NUM_ITEMS               NUM_BLOCK_RECORDS
+#define SPEED_INITIAL           1
+#define SPEED_JUMP_INIT         2
+#define SLIP_OFFSET             2           // Left/right slip offset, in pixels
+#define TIMESTEP_ACCEL          200         // in milliseconds
+#define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
+#define TIMESTEP_BUMP_COIN      5           // in milliseconds
+#define TIMESTEP_ENEMY          10          // in milliseconds
+#define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
+#define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
+#define KILL_ZONE_Y             5           // Height, in pixels, in which an enemy is killed
 
 
 

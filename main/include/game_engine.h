@@ -23,14 +23,6 @@
  *************************************************/
 
 typedef struct {
-    uint8_t destroyed :         1;
-    uint8_t has_item :          1;
-    uint8_t bumping :           1;
-    int16_t row;
-    int8_t column;
-} block_t;
-
-typedef struct {
     uint8_t top_collision :     1;
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
@@ -46,13 +38,35 @@ typedef struct {
 } physics_t;
 
 typedef struct {
-    uint8_t life :              1;
+    uint8_t bumping :           1;
+    uint8_t steps;
+    uint32_t timer;
+} animation_t;
+
+typedef struct {
+    uint8_t is_hit :            1;
+    uint8_t destroyed :         1;
+    uint8_t item_given :        1;
+    uint8_t bumping :           1;
+    int16_t row;
+    int8_t column;
+} block_t;
+
+typedef struct {
+    uint8_t life;
     int16_t row;
     int8_t column;
     uint32_t timer_x;
     uint32_t timer_y;
     physics_t physics;
 } enemy_t;
+
+typedef struct {
+    uint8_t spawned :           1;
+    uint8_t taken :             1;
+    animation_t animation;
+    sprite_t sprite;
+} item_t;
 
 typedef struct {
     uint8_t life :              4;
@@ -70,7 +84,11 @@ typedef struct {
  * Prototypes
  *************************************************/
 
+extern block_t blocks[NUM_BLOCK_RECORDS];
 extern enemy_t enemies[NUM_ENEMY_RECORDS];
+extern item_t items[NUM_ITEMS];
+
+void initialize_blocks_records(void);
 
 uint8_t create_block_record(block_t block, uint16_t map_row);
 
@@ -91,7 +109,7 @@ block_t *get_block_record(int16_t row, int8_t column);
  */
 uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *physics, uint16_t map_x);
 
-void bump(block_t *block, sprite_t *sprite, uint64_t timer);
+void bump_block(block_t *block, sprite_t *sprite, uint64_t timer);
 
 void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_row);
 
@@ -100,6 +118,8 @@ uint8_t create_enemy_record(enemy_t enemy);
 enemy_t *get_enemy_record(int16_t row, int8_t column);
 
 void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t end_row, uint16_t map_row);
+
+uint8_t store_item(item_t item);
 
 
 #endif // __GAME_ENGINE_H__

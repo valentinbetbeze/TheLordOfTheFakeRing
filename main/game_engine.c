@@ -1,33 +1,13 @@
 #include "game_engine.h"
 
-static block_t blocks[NUM_BLOCK_RECORDS];
+block_t blocks[NUM_BLOCK_RECORDS];
 enemy_t enemies[NUM_ENEMY_RECORDS] = {0};
+item_t items[NUM_ITEMS] = {0};
 
 
-static uint8_t set_block_flags_on_hit(block_t *block, int8_t block_type)
-{
-    if (block == NULL) {
-        printf("Error(set_block_flags_on_hit): Empty block_t pointer.\n");
-        return 1;
-    }
-    switch (block_type) {
-        case BREAKABLE_BLOCK:
-            block->destroyed    = 1;
-            block->has_item     = 0;
-            block->bumping      = 0;
-            break;
-        case BONUS_BLOCK:
-            block->destroyed    = 0;
-            block->has_item     = 0;
-            block->bumping      = 1;
-            break;
-        default:
-            printf("Warning(set_block_flags_on_hit): You're trying to change the state of a block that cannot interact with external events. Block type: %i\n", block_type);
-            break;
-    }
-    return 0;
-}
-
+/*************************************************
+ * Blocks
+ *************************************************/
 
 static uint8_t is_block_destroyed(int16_t row, int8_t column)
 {
@@ -39,20 +19,40 @@ static uint8_t is_block_destroyed(int16_t row, int8_t column)
 }
 
 
+static uint8_t set_block_as_hit(int16_t row, int8_t column, uint16_t map_row)
+{
+    block_t new_block = {
+        .row = row,
+        .column = column,
+        .is_hit = 1
+    };
+    uint8_t err = create_block_record(new_block, map_row);
+    if (err == 1) {
+        block_t *existing_block = get_block_record(row, column);
+        existing_block->is_hit = 1;
+    }
+    else if (err == 2) {
+        return 1;
+    }
+    return 0;
+}
+
+
+void initialize_blocks_records(void)
+{
+    for (int i = 0; i < NUM_BLOCK_RECORDS; i++) {
+        blocks[i].row          = -1; // Empty slot identifier
+        blocks[i].column       = -1;
+        blocks[i].is_hit       = 0;
+        blocks[i].destroyed    = 0;
+        blocks[i].item_given   = 0;
+        blocks[i].bumping      = 0;
+    }
+}
+
+
 uint8_t create_block_record(block_t block, uint16_t map_row)
 {
-    // Initialize the blocks array the first time only
-    static uint8_t bloc_record_initialized = 0;
-    if (!bloc_record_initialized) {
-        for (int i = 0; i < NUM_BLOCK_RECORDS; i++) {
-            blocks[i].row          = -1; // Empty slot identifier
-            blocks[i].column       = -1; // Empty slot identifier
-            blocks[i].destroyed    = 0;
-            blocks[i].has_item     = 0;
-            blocks[i].bumping      = 0;
-        }
-        bloc_record_initialized = 1;
-    }
     // Scan the blocks log to create the state record of the block
     int8_t index = -1;
     uint8_t free_slot_found = 0;
@@ -118,8 +118,8 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
         uint8_t top :       1;
         uint8_t bottom :    1;
     } collision_risk = {
-        .left   = ((uint8_t)BLOCK_SIZE - physics->speed_x <= x_offset),
-        .right  = (1 <= x_offset && x_offset <= physics->speed_x),
+        .left   = ((uint8_t)BLOCK_SIZE - physics->speed_x - SLIP_OFFSET <= x_offset),
+        .right  = (1 <= x_offset && x_offset <= physics->speed_x + SLIP_OFFSET),
         .top    = ((uint8_t)BLOCK_SIZE / 2 < y_offset && y_offset <= BLOCK_SIZE - 1),
         .bottom = (1 <= y_offset && y_offset < (uint8_t)BLOCK_SIZE / 2),
     };
@@ -157,8 +157,8 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
 
         .top    = (collision_risk.top && IS_SOLID(block_tl) &&
                   !is_block_destroyed(ref_row, ref_col) &&
-                  x_offset < BLOCK_SIZE - physics->speed_x) ||
-                  (collision_risk.top &&  physics->speed_x < x_offset && IS_SOLID(block_tr) &&
+                  x_offset < BLOCK_SIZE - physics->speed_x - SLIP_OFFSET) ||
+                  (collision_risk.top &&  physics->speed_x + SLIP_OFFSET < x_offset && IS_SOLID(block_tr) &&
                   !is_block_destroyed(ref_row + 1, ref_col)),
 
         .bottom = (collision_risk.bottom && IS_SOLID(block_bl) && 
@@ -179,38 +179,15 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
     if (collision.top) {
         if (IS_INTERACTIVE(block_tl) && !is_block_destroyed(ref_row, ref_col)
             && x_offset <= BLOCK_SIZE / 2) {
-            block_t block = {
-                .row = ref_row,
-                .column = ref_col
-            };
-            set_block_flags_on_hit(&block, block_tl);
-            uint8_t err = create_block_record(block, map_row);
-            if (err == 1) {
-                block_t *record = get_block_record(ref_row, ref_col);
-                *record = block;
-                // TODO: modifying blockstates should be more modular. I have only
-                // 1 function here to do it. Must be changed for object features.
-                // TODO: Think about splitting this function if possible.
-            }
-            else if (err == 2) {
+            if (set_block_as_hit(ref_row, ref_col, map_row)) {
                 return 1;
             }
         }
         else if (IS_INTERACTIVE(block_tr) && !is_block_destroyed(ref_row + 1, ref_col)
                  && BLOCK_SIZE / 2 < x_offset) {
-            block_t block = {
-                .row = ref_row + 1,
-                .column = ref_col
-            };
-            set_block_flags_on_hit(&block, block_tr);
-            uint8_t err = create_block_record(block, map_row);
-            if (err == 1) {
-                block_t *record = get_block_record(ref_row + 1, ref_col);
-                *record = block;
-            }
-            else if (err == 2) {
+            if (set_block_as_hit(ref_row + 1, ref_col, map_row)) {
                 return 1;
-            } 
+            }
         }
         physics->top_collision = 1;
         physics->pos_y += BLOCK_SIZE - y_offset;
@@ -223,11 +200,12 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
 }
 
 
-void bump(block_t *block, sprite_t *sprite, uint64_t timer)
+void bump_block(block_t *block, sprite_t *sprite, uint64_t timer)
 {
     static uint64_t t0 = 0;
     static uint8_t steps = 0;
-    if ((int)(timer - t0 / TIMESTEP_BUMP) < 1) {
+
+    if ((timer - t0) / TIMESTEP_BUMP_BLOCK < 1) {
         return;
     }
 
@@ -241,11 +219,11 @@ void bump(block_t *block, sprite_t *sprite, uint64_t timer)
     }
 
     steps++;
-    if (steps <= BUMP_HEIGHT) {
+    if (steps <= HEIGHT_BUMP_BLOCK) {
         sprite->pos_y -= steps;
     }
-    else if (steps <= BUMP_HEIGHT * 2) {
-        sprite->pos_y -= (BUMP_HEIGHT * 2 - steps);
+    else if (steps <= HEIGHT_BUMP_BLOCK * 2) {
+        sprite->pos_y -= (HEIGHT_BUMP_BLOCK * 2 - steps);
     }
     else {
         block->bumping = 0;
@@ -254,6 +232,10 @@ void bump(block_t *block, sprite_t *sprite, uint64_t timer)
     t0 = timer;
 }
 
+
+/*************************************************
+ * Enemies
+ *************************************************/
 
 void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_row)
 {
@@ -271,8 +253,8 @@ void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_r
     enemy->physics.jumping          = 0;
     enemy->physics.pos_x            = BLOCK_SIZE * (row - map_row);
     enemy->physics.pos_y            = BLOCK_SIZE * (NUM_BLOCKS_Y - 1 - column);
-    enemy->physics.speed_x          = INITIAL_SPEED;
-    enemy->physics.speed_y          = INITIAL_SPEED;
+    enemy->physics.speed_x          = SPEED_INITIAL;
+    enemy->physics.speed_y          = SPEED_INITIAL;
 }
 
 
@@ -295,7 +277,7 @@ uint8_t create_enemy_record(enemy_t enemy)
         }
     }
     if (index == -1) {
-        printf("Error(update_enemy_state): Cannot add new enemy (enemies[] full).\n");
+        printf("Error(create_enemy_record): Cannot add new enemy (enemies[] full).\n");
         return 2;
     }
     memset(&enemies[index], 0, sizeof(enemies[index]));
@@ -328,3 +310,28 @@ void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t 
         }
     }
 }
+
+
+/*************************************************
+ * Items
+ *************************************************/
+
+uint8_t store_item(item_t item)
+{
+    // Scan the item log to store the item
+    int8_t index = -1;
+    for (int8_t i = 0; i < NUM_ITEMS; i++) {
+        if (!items[i].spawned || items[i].taken || items[i].sprite.pos_x < -BLOCK_SIZE) {
+            index = i;
+            break;
+        }
+    }
+    if (index == -1) {
+        printf("Error(store_item): Cannot add new item (items[] full).\n");
+        return 1;
+    }
+    memset(&items[index], 0, sizeof(items[index]));
+    items[index] = item;
+    return 0; 
+}
+

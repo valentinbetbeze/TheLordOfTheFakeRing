@@ -202,8 +202,17 @@ void st7735s_draw_sprite(sprite_t sprite)
     for (uint8_t y = 0; y < sprite.height; y++) {
         for (uint8_t x = 0; x < sprite.width; x++) {
             uint16_t color = sprite.data[y * sprite.width + x];
-            if (color != TRANSPARENT) {
-                write_to_frame(x + sprite.pos_x, y + sprite.pos_y, color);
+            if (color != TRANSPARENT && !sprite.flip_x && !sprite.flip_y) {
+                write_to_frame(sprite.pos_x + x, sprite.pos_y + y, color);
+            }
+            else if (color != TRANSPARENT && sprite.flip_x && !sprite.flip_y) {
+                write_to_frame(sprite.pos_x + sprite.width - 1 - x, sprite.pos_y + y, color);
+            }
+            else if (color != TRANSPARENT && !sprite.flip_x && sprite.flip_y) {
+                write_to_frame(sprite.pos_x + x, sprite.pos_y + sprite.height - 1 - y, color);
+            }
+            else if (color != TRANSPARENT && sprite.flip_x && sprite.flip_y) {
+                write_to_frame(sprite.pos_x + sprite.width - 1 - x, sprite.pos_y + sprite.height - 1 - y, color);
             }
         }
     }
