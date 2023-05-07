@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "project_config.h"
 #include "gamepad.h"
@@ -36,12 +37,12 @@ struct {
     uint64_t timer;
 } game = {
     .reset      = 0,
-    .playing    = 0,
+    .playing    = 1,
     .cam_moving = 0,
     .map_id     = 0,
     .map_x      = 0,    // First pixel x-coordinate of the current map frame
     .map_row    = 1,    // First row of the current map frame
-    .timer      = 0
+    .timer      = 0,
 };
 
 
@@ -105,7 +106,8 @@ void app_main()
     gamepad_init_joystick(&adc_handle, &joystick);
 
     // Create and initialize buttons
-    button_t button_C;
+    button_t button_A, button_C;
+    gamepad_init_button(&button_A, PIN_BTN_A);
     gamepad_init_button(&button_C, PIN_BTN_C);
 #pragma endregion
 
@@ -113,6 +115,7 @@ void app_main()
     /*************************************************
      * Game initialization
      *************************************************/
+#pragma region
     // Setup game text objects
     const char coins_text[] = "COINS: ";
     const text_t coins_text_object = {
@@ -151,8 +154,11 @@ void app_main()
     game.map_id = MAP_ID(map);
     character_t player = {
         .life               = 3,
+        .lightstaff         = 0,
+        .shield             = 0,
+        .forward            = 1,
         .physics.pos_x      = BLOCK_SIZE,
-        .physics.pos_y      = BLOCK_SIZE,
+        .physics.pos_y      = LCD_HEIGHT - 2 * BLOCK_SIZE,
         .physics.speed_x    = SPEED_INITIAL,
         .physics.speed_y    = SPEED_INITIAL,
         .sprite.height      = BLOCK_SIZE,
@@ -163,8 +169,9 @@ void app_main()
     initialize_blocks_records();
     // Create the enemies appearing in the very first frame of the map
     spawn_enemies(map, 1, NUM_BLOCKS_X + 1, game.map_row);
+#pragma endregion
 
-    while(1) {
+    while(game.playing) {
         // Get the time for the current iteration
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
@@ -174,6 +181,7 @@ void app_main()
          * Game state check
          *************************************************/
         if (player.life == 0) {
+            game.playing = 0;
             break;
         }
         else if (game.reset) {
@@ -182,6 +190,12 @@ void app_main()
             game.map_x = 0;
             game.map_row = 1;
             // Reset character state (except life!)
+            player.shield                       = 0;
+            player.lightstaff                   = 0;
+            player.forward                      = 1;
+            player.power_used                   = 0;
+            player.spell_radius                 = 0;
+            player.timer                        = 0;
             player.physics.pos_x                = BLOCK_SIZE;
             player.physics.pos_y                = LCD_HEIGHT - 2 * BLOCK_SIZE;
             player.physics.speed_x              = SPEED_INITIAL;
@@ -192,16 +206,16 @@ void app_main()
             player.physics.bottom_collision     = 0;
             player.physics.left_collision       = 0;
             player.physics.right_collision      = 0;
-            player.firestaff                    = 0;
-            player.shield                       = 0;
-            player.timer                        = 0;
-            // Initialize enemy records
+            // Reset enemy records
             for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
                 memset(&enemies[i], 0, sizeof(enemies[i]));
             }
-            // Re-spawn first enemies
+            // Reset first enemies
             spawn_enemies(map, 1, NUM_BLOCKS_X + 1, game.map_row);
-
+            // Reset items
+            for (uint8_t i = 0; i < NUM_ITEMS; i++) {
+                memset(&items[i], 0, sizeof(items[i]));
+            }
             ets_delay_us(1*1000*1000);
         }
         // Reset hit flag for each blocks
@@ -210,25 +224,10 @@ void app_main()
         }
 
         /*************************************************
-         * Player state & position update
+         * Main character state & position update
          *************************************************/
-        // Update the player's x-position
-        int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
-        player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
-        if (player.physics.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
-            game.map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixel
-            game.map_row = (uint16_t)(game.map_x / BLOCK_SIZE) + 1;
-            game.cam_moving = 1;
-            player.physics.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
-        }
-        else if (player.physics.pos_x < 0) {
-            player.physics.pos_x = 0;
-        }
-        else {
-            game.cam_moving = 0;
-        }
-
-        // Check if the player is falling or jumping
+#pragma region
+        // Check the state (falling/jumping)
         if (player.physics.falling && player.physics.bottom_collision) {
             player.physics.falling = 0;
             player.physics.speed_y = SPEED_INITIAL;
@@ -248,8 +247,30 @@ void app_main()
         else if (!player.physics.jumping && !player.physics.bottom_collision) {
             player.physics.falling = 1;
         }
-
-        // Update the player's y-position
+        // Update x-position
+        int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
+        if (0 < x / 100) {
+            player.forward = 1;
+            player.sprite.flip_x = 0;
+        }
+        else if (x / 100 < 0){
+            player.forward = 0;
+            player.sprite.flip_x = 1;
+        }
+        player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
+        if (player.physics.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+            game.cam_moving = 1;
+            game.map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixel
+            game.map_row = (uint16_t)(game.map_x / BLOCK_SIZE) + 1;
+            player.physics.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
+        }
+        else if (player.physics.pos_x < 0) {
+            player.physics.pos_x = 0;
+        }
+        else {
+            game.cam_moving = 0;
+        }
+        // Update y-position
         player.physics.accelerating = (game.timer - player.timer) / TIMESTEP_ACCEL;
         if (player.physics.jumping) {
             if (player.physics.accelerating) {
@@ -267,10 +288,20 @@ void app_main()
             }
             player.physics.pos_y += player.physics.speed_y;
         }
-        if (LCD_HEIGHT < player.physics.pos_y) {
+        // Check for collisions with blocks & update position if necessary
+        if (check_block_collisions(map, &player.physics, game.map_x)) {
+            return;
+        }
+        // Check for lightstaff usage
+        if (player.lightstaff && gamepad_poll_button(&button_A)) {
+            player.power_used = 1;
+        }
+        // Check if the player fell
+        if (LCD_HEIGHT <= player.physics.pos_y) {
             player.life--;
             game.reset = 1;
         }
+#pragma endregion
 
 
         /*************************************************
@@ -308,21 +339,7 @@ void app_main()
                 enemies[i].timer_y = (uint32_t)game.timer;
             }
             enemies[i].physics.pos_y += enemies[i].physics.speed_y;
-        }
-
-
-        /*************************************************
-         * Collision checks
-         *************************************************/
-        // PLayer's collisions
-        if (check_block_collisions(map, &player.physics, game.map_x)) {
-            return;
-        }
-        // Enemies' collisions
-        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-            if (enemies[i].life == 0) {
-                break;
-            }
+            // Check for block collisions and update position if necessary
             if (check_block_collisions(map, &enemies[i].physics, game.map_x)) {
                 return;
             }
@@ -331,9 +348,15 @@ void app_main()
                 player.physics.pos_x > enemies[i].physics.pos_x - BLOCK_SIZE &&
                 player.physics.pos_y < enemies[i].physics.pos_y + BLOCK_SIZE &&
                 player.physics.pos_y > enemies[i].physics.pos_y - BLOCK_SIZE + KILL_ZONE_Y) {
-                
-                player.life--;
-                game.reset = 1;
+                if (player.shield) {
+                    player.shield = 0;
+                    enemies[i].life--;
+                }
+                else {
+                    player.life--;
+                    game.reset = 1;
+                    break;
+                }
             }
             else if (player.physics.pos_x < enemies[i].physics.pos_x + BLOCK_SIZE &&
                      player.physics.pos_x > enemies[i].physics.pos_x - BLOCK_SIZE &&
@@ -345,11 +368,54 @@ void app_main()
                 player.physics.speed_y = 1;
                 player.timer = (uint32_t)game.timer;
             }
+            // Check for lightstaff's usage
+            if (player.lightstaff && player.power_used) {
+                uint8_t dist_x = abs(player.physics.pos_x - enemies[i].physics.pos_x);
+                uint8_t dist_y = abs(player.physics.pos_y - enemies[i].physics.pos_y);
+                if (hypot(dist_x, dist_y) < player.spell_radius) {
+                    enemies[i].life--;
+                }
+            }
         }
 
 
         /*************************************************
-         * Blocks states & items update
+         * Items states & positions update
+         *************************************************/
+        // Collision between items and the player
+        for (int i = 0; i < NUM_ITEMS; i++) {
+            if (!items[i].spawned || items[i].taken) {
+                continue;
+            }
+            else if (player.physics.pos_x < items[i].sprite.pos_x + items[i].sprite.width &&
+                     player.physics.pos_x >= items[i].sprite.pos_x - items[i].sprite.width &&
+                     player.physics.pos_y < items[i].sprite.pos_y + items[i].sprite.height &&
+                     player.physics.pos_y >= items[i].sprite.pos_y - items[i].sprite.height) {
+                if (items[i].type == LIGHTSTAFF) {
+                    if (player.lightstaff) {
+                        game.coins += 20;
+                    }
+                    player.lightstaff = 1;
+                    items[i].taken = 1;
+                }
+                else if (items[i].type == SHIELD) {
+                    if (player.shield) {
+                        game.coins += 20;
+                    }
+                    player.shield = 1;
+                    items[i].taken = 1;
+                }
+                break;
+            }
+            // Update the x-position of each object with respect to the camera movement speed
+            if (items[i].spawned && game.cam_moving) {
+                items[i].sprite.pos_x -= player.physics.speed_x;
+            }
+        }
+
+
+        /*************************************************
+         * Blocks states
          *************************************************/
         for (uint8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
             if (blocks[i].row == -1 || blocks[i].column == -1) {
@@ -365,17 +431,7 @@ void app_main()
                         break;
                     case BONUS_BLOCK:
                         if (!blocks[i].item_given) {
-                            // TODO: generate random item command here
-                            item_t item = {
-                                .spawned = 1,
-                                .sprite.height = BLOCK_SIZE,
-                                .sprite.width = BLOCK_SIZE,
-                                .sprite.pos_x = BLOCK_SIZE * (blocks[i].row - 1) - game.map_x,
-                                .sprite.pos_y = LCD_HEIGHT - (BLOCK_SIZE * (blocks[i].column + 1)),
-                                .sprite.data = coin_sprite_1,
-                                .animation.bumping = 1
-                            };
-                            store_item(item);
+                            store_item(generate_item(blocks[i].row, blocks[i].column, game.map_x));
                             blocks[i].bumping = 1;
                             blocks[i].item_given = 1;
                         }
@@ -385,10 +441,6 @@ void app_main()
                         printf("Warning(set_block_flags_on_hit): You're trying to change the state of a block that cannot interact with external events. Block type: %i\n", block_type);
                         break;
                 }
-            }
-            // Update the x-position of each object with respect to the camera movement speed
-            if (game.cam_moving) {
-                items[i].sprite.pos_x -= player.physics.speed_x;
             }
         }
 
@@ -401,7 +453,7 @@ void app_main()
          Graphic assets drawn first will appear below other graphic assets.
         */ 
         st7735s_fill_background(MAP_BACKGROUND(map));
-        // Draw the items
+        // Draw items
         for (int i = 0; i < NUM_ITEMS; i++) {
             if (!items[i].spawned) {
                 continue;
@@ -410,45 +462,66 @@ void app_main()
                 memset(&items[i], 0, sizeof(items[i]));
                 continue;
             }
-            if (items[i].animation.bumping &&
-                (game.timer - items[i].animation.timer) / TIMESTEP_BUMP_COIN > 1) {
-                // Make the coin go up and down
-                items[i].animation.steps++;
-                if (items[i].animation.steps <= HEIGHT_BUMP_COIN) {
-                    items[i].sprite.pos_y--;
-                }
-                else if (items[i].animation.steps <= HEIGHT_BUMP_COIN * 2 + 1) {
-                    items[i].sprite.pos_y++;
-                }
-                else {
-                    items[i].animation.bumping = 0;
-                    items[i].animation.steps = 0;
-                    items[i].taken = 1;
-                    game.coins++;
-                }
-                // Animate the coin
-                uint8_t next_sprite = (items[i].animation.steps % 3 == 1);
-                if (next_sprite && items[i].sprite.data == coin_sprite_1) {
-                    items[i].sprite.data = coin_sprite_2;
-                }
-                else if (next_sprite && items[i].sprite.data == coin_sprite_2 &&
-                         !items[i].sprite.flip_x) {
-                    items[i].sprite.data = coin_sprite_3;
-                }
-                else if (next_sprite && items[i].sprite.data == coin_sprite_3) {
-                    items[i].sprite.data = coin_sprite_2;
-                    items[i].sprite.flip_x = 1;
-                }
-                else if (next_sprite && items[i].sprite.data == coin_sprite_2 &&
-                         items[i].sprite.flip_x) {
-                    items[i].sprite.data = coin_sprite_1;
-                    items[i].sprite.flip_x = 0;
-                }
-                items[i].animation.timer = (uint32_t)game.timer;
+            switch (items[i].type) {
+                case COIN:
+                    // Animate the coin
+                    if ((game.timer - items[i].timer) / TIMESTEP_BUMP_COIN < 1) {
+                        break;
+                    }
+                    items[i].steps++;
+                    if (items[i].steps <= HEIGHT_BUMP_COIN) {
+                        items[i].sprite.pos_y--;
+                    }
+                    else if (items[i].steps <= HEIGHT_BUMP_COIN * 2 + 1) {
+                        items[i].sprite.pos_y++;
+                    }
+                    else {
+                        items[i].steps = 0;
+                        items[i].taken = 1;
+                        game.coins++;
+                    }
+                    // Change the coin sprite 
+                    uint8_t next_sprite = (items[i].steps % 3 == 1);
+                    if (next_sprite && items[i].sprite.data == sprite_coin_1) {
+                        items[i].sprite.data = sprite_coin_2;
+                    }
+                    else if (next_sprite && items[i].sprite.data == sprite_coin_2 &&
+                            !items[i].sprite.flip_x) {
+                        items[i].sprite.data = sprite_coin_3;
+                    }
+                    else if (next_sprite && items[i].sprite.data == sprite_coin_3) {
+                        items[i].sprite.data = sprite_coin_2;
+                        items[i].sprite.flip_x = 1;
+                    }
+                    else if (next_sprite && items[i].sprite.data == sprite_coin_2 &&
+                            items[i].sprite.flip_x) {
+                        items[i].sprite.data = sprite_coin_1;
+                        items[i].sprite.flip_x = 0;
+                    }
+                    items[i].timer = (uint32_t)game.timer;
+                    break;
+
+                case LIGHTSTAFF:
+                    if (items[i].steps <= BLOCK_SIZE) {
+                        items[i].steps++;
+                        items[i].sprite.pos_y--;
+                    }
+                    break;
+
+                case SHIELD:
+                    if (items[i].steps <= BLOCK_SIZE) {
+                        items[i].steps++;
+                        items[i].sprite.pos_y--;
+                    }
+                    break;
+                default:
+                    break;
             }
-            st7735s_draw_sprite(items[i].sprite);
+            if (items[i].sprite.data != NULL) {
+                st7735s_draw_sprite(items[i].sprite);
+            }
         }
-        // Draw the blocks
+        // Draw blocks
         for (uint8_t row = game.map_row; row <= game.map_row + NUM_BLOCKS_X; row++) {
             for (int column = 0; column < NUM_BLOCKS_Y; column++) {
                 int8_t block_type = map[row][NUM_BLOCKS_Y - 1 - column];
@@ -499,11 +572,11 @@ void app_main()
                 }
             }
         }
-        // Draw the enemies
+        // Draw enemies
         for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-            if (enemies[i].life == 0) {
+            if (enemies[i].life <= 0) {
                 memset(&enemies[i], 0, sizeof(enemies[i]));
-                break;
+                continue;
             }
             sprite_t sprite = {
                 .height = BLOCK_SIZE,
@@ -527,21 +600,92 @@ void app_main()
         }
         // Draw text
         st7735s_draw_text(coins_text_object);
-        sprintf(num_coins_text, "%i", (uint8_t)game.coins);
-        st7735s_draw_text(coins_object);
-        
         st7735s_draw_text(life_text_object);
+        sprintf(num_coins_text, "%i", (uint8_t)game.coins);
         sprintf(num_life_text, "%i", (uint8_t)player.life);
+        st7735s_draw_text(coins_object);        
         st7735s_draw_text(life_object);
-        
-
-        // Finally, draw the player
+        // Finally, draw the player & its stuff
+        if (player.shield) {
+            rectangle_t shield_fill = {
+                .pos_x = player.physics.pos_x,
+                .pos_y = player.physics.pos_y,
+                .width = BLOCK_SIZE,
+                .height = BLOCK_SIZE,
+                .color = WHITE,
+                .alpha = SHIELD_ALPHA
+            };
+            st7735s_draw_rectangle(shield_fill);
+            sprite_t shield_edge = {
+                .height = BLOCK_SIZE,
+                .width = BLOCK_SIZE,
+                .pos_x = player.physics.pos_x - BLOCK_SIZE,
+                .pos_y = player.physics.pos_y,
+                .data = sprite_shield_edge,
+                .alpha = SHIELD_ALPHA,
+            };
+            st7735s_draw_sprite(shield_edge);
+            shield_edge.CW_90 = 1;
+            shield_edge.pos_x += BLOCK_SIZE;
+            shield_edge.pos_y -= BLOCK_SIZE;
+            st7735s_draw_sprite(shield_edge);
+            shield_edge.CW_90 = 0;
+            shield_edge.ACW_90 = 1;
+            shield_edge.pos_y += 2 * BLOCK_SIZE;
+            st7735s_draw_sprite(shield_edge);
+            shield_edge.ACW_90 = 0;
+            shield_edge.flip_x = 1;
+            shield_edge.pos_x += BLOCK_SIZE;
+            shield_edge.pos_y -= BLOCK_SIZE;
+            st7735s_draw_sprite(shield_edge);
+        }
         player.sprite.pos_x = player.physics.pos_x;
         player.sprite.pos_y = player.physics.pos_y;
         st7735s_draw_sprite(player.sprite);
-
+        if (player.lightstaff) {
+            sprite_t lightstaff = {
+                .width = BLOCK_SIZE,
+                .height = BLOCK_SIZE,
+                .pos_x = player.physics.pos_x,
+                .pos_y = player.physics.pos_y,
+                .data = sprite_lightstaff_equipped
+            };
+            if (!player.forward) {
+                lightstaff.flip_x = 1;
+            }
+            st7735s_draw_sprite(lightstaff);
+        }
+        // Lightstaff power animation
+        if (player.power_used && player.spell_radius < (uint16_t)LCD_SIZE) {
+            player.spell_radius += 5;
+            circle_t circle = {
+                .pos_x = player.physics.pos_x + BLOCK_SIZE / 2,
+                .pos_y = player.physics.pos_y + BLOCK_SIZE / 2,
+                .radius = player.spell_radius,
+                .thickness = 0,
+                .color = WHITE
+            };
+            st7735s_draw_circle(circle);
+        }
+        else if (player.power_used && player.spell_radius < (uint16_t)LCD_SIZE + 100) {
+            player.lightstaff = 0;
+            player.spell_radius += 10;
+            rectangle_t rectangle = {
+                .width = LCD_WIDTH,
+                .height = LCD_HEIGHT,
+                .pos_x = 0,
+                .pos_y = 0,
+                .color = WHITE,
+                .alpha = (float)(player.spell_radius - LCD_SIZE) / 100.0
+            };
+            st7735s_draw_rectangle(rectangle);
+        }
+        else {
+            player.power_used = 0;
+            player.spell_radius = 0;
+        }
+        
         st7735s_push_frame(tft_handle);
-
 
         /*************************************************
          * Music

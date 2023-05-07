@@ -21,7 +21,7 @@
 /*************************************************
  * GPIOs and Constants
  *************************************************/
-#define PIN_BTN_A		GPIO_NUM_18
+#define PIN_BTN_A		GPIO_NUM_34
 #define PIN_BTN_B       GPIO_NUM_5
 #define PIN_BTN_C       GPIO_NUM_19
 #define PIN_BTN_D       GPIO_NUM_21

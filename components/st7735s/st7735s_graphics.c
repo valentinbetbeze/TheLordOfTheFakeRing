@@ -8,8 +8,9 @@
  * @param x Position of the pixel on the x-axis (along width)
  * @param y Position of the pixel on the y-axis (along height)
  * @param data Color of the pixel
+ * @param transparency Transparency to apply. 0 means no transparency, 1 means full transparency.
  */
-static void write_to_frame(int16_t x, int16_t y, uint16_t color)
+static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
 {
     // Do not write if out of display's resolution
     if (x < 0 || LCD_WIDTH <= x || y < 0 || LCD_HEIGHT <= y ) {
@@ -54,7 +55,28 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color)
         return;
     }
 
-    frame[row][column] = color;
+    if (alpha == 0) {
+        frame[row][column] = color;
+        return;
+    }
+    
+    uint16_t color1 = (uint16_t)SPI_SWAP_DATA_TX(frame[row][column], 16);
+    uint8_t red1 = (color1 >> 11);
+    uint8_t green1 = (color1 >> 5 & 0b111111);
+    uint8_t blue1 = (color1 & 0b11111);
+
+    uint16_t color2 = (uint16_t)SPI_SWAP_DATA_TX(color, 16);
+    uint8_t red2 = (color2 >> 11);
+    uint8_t green2 = (color2 >> 5 & 0b111111);
+    uint8_t blue2 = (color2 & 0b11111);
+
+    uint8_t avg_red = alpha * red1 + (1-alpha) * red2;
+    uint8_t avg_green = alpha * green1 + (1-alpha) * green2;
+    uint8_t avg_blue = alpha * blue1 + (1-alpha) * blue2;
+    uint16_t avg_color = avg_red << 11 | avg_green << 5 | avg_blue;
+    avg_color = (uint16_t)SPI_SWAP_DATA_TX(avg_color, 16);
+
+    frame[row][column] = avg_color;
 }
 
 
@@ -62,28 +84,27 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color)
  * @brief Rasterize 1 point-per-octant of a circle, for all
  * 8 octants.
  * 
- * @param xc Center of the circle on the x-axis.
- * @param yc Center of the circle on the y-axis.
+ * @param circle Circle object to rasterize.
  * @param x Location of one point on the x-axis. 
  * @param y Location of one point on the y-axis.
- * @param color Color of the circle.
+
  * 
  * @note It does not matter which initial position of one of the
  * 8 points is given as input, the function will draw the 8 pixels
  * independently. However, note that the (x, y) coordinates must 
  * belong to the same point.
  */
-static void rasterize_circle(uint8_t xc, uint8_t yc, uint8_t x, uint8_t y, uint16_t color)
+static void rasterize_circle(circle_t circle, uint8_t x, uint8_t y)
 {
     // Draw 8 pixels at once, one for each octant
-    write_to_frame((int16_t)xc + x, (int16_t)yc + y, color);
-    write_to_frame((int16_t)xc + y, (int16_t)yc + x, color);
-    write_to_frame((int16_t)xc + y, (int16_t)yc - x, color);
-    write_to_frame((int16_t)xc + x, (int16_t)yc - y, color);
-    write_to_frame((int16_t)xc - x, (int16_t)yc - y, color);
-    write_to_frame((int16_t)xc - y, (int16_t)yc - x, color);
-    write_to_frame((int16_t)xc - y, (int16_t)yc + x, color);
-    write_to_frame((int16_t)xc - x, (int16_t)yc + y, color);
+    write_to_frame((int16_t)circle.pos_x + x, (int16_t)circle.pos_y + y, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x + y, (int16_t)circle.pos_y + x, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x + y, (int16_t)circle.pos_y - x, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x + x, (int16_t)circle.pos_y - y, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x - x, (int16_t)circle.pos_y - y, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x - y, (int16_t)circle.pos_y - x, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x - y, (int16_t)circle.pos_y + x, circle.color, circle.alpha);
+    write_to_frame((int16_t)circle.pos_x - x, (int16_t)circle.pos_y + y, circle.color, circle.alpha);
 }
 
 
@@ -99,7 +120,7 @@ uint16_t st7735s_rgb565(uint32_t rgb888)
      Swap data to send MSB first (required for compatibility with ST7735S).
      See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html#transactions-with-integers-other-than-uint8-t
     */
-    return SPI_SWAP_DATA_TX(rgb565, 16);
+    return rgb565;
 }
 
 
@@ -117,7 +138,7 @@ void st7735s_draw_rectangle(rectangle_t rectangle)
 {
     for (int x = rectangle.pos_x; x < (rectangle.pos_x + rectangle.width); x++) {
         for (int y = rectangle.pos_y; y < (rectangle.pos_y + rectangle.height); y++) {
-            write_to_frame(x, y, rectangle.color);
+            write_to_frame(x, y, rectangle.color, rectangle.alpha);
         }
     }
 }
@@ -133,18 +154,18 @@ void st7735s_draw_circle(circle_t circle)
     for (uint8_t x = 0; x < x_end; x++) {
         // Outer circle
         y_out = round(sqrt(pow(circle.radius, 2) - pow(x, 2)));
-        rasterize_circle(circle.pos_x, circle.pos_y, x, y_out, circle.color);
+        rasterize_circle(circle, x, y_out);
         // No thickness means fully filled circle
         if (circle.thickness == 0) {
             for (uint8_t y = 0; y < y_out; y++) {
-                rasterize_circle(circle.pos_x, circle.pos_y, x, y, circle.color);
+                rasterize_circle(circle, x, y);
             }
         }
         else if (1 < circle.thickness){
             y_in = round(sqrt(pow(circle.radius - circle.thickness, 2) - pow(x, 2)));
-            rasterize_circle(circle.pos_x, circle.pos_y, x, y_in, circle.color);
+            rasterize_circle(circle, x, y_in);
             for (uint8_t y = y_in + 1; y < y_out; y++) {
-                rasterize_circle(circle.pos_x, circle.pos_y, x, y, circle.color);
+                rasterize_circle(circle, x, y);
             }
         }
     }
@@ -188,7 +209,7 @@ void st7735s_draw_text(text_t text)
                         px_pos_x    = text.pos_x
                                     + (text_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
                                     + (FONT_SIZE - 1 - bit);
-                        write_to_frame(px_pos_x, px_pos_y, text.color);
+                        write_to_frame(px_pos_x, px_pos_y, text.color, text.alpha);
                     }
                 }
             }
@@ -201,19 +222,36 @@ void st7735s_draw_sprite(sprite_t sprite)
 {
     for (uint8_t y = 0; y < sprite.height; y++) {
         for (uint8_t x = 0; x < sprite.width; x++) {
+
             uint16_t color = sprite.data[y * sprite.width + x];
-            if (color != TRANSPARENT && !sprite.flip_x && !sprite.flip_y) {
-                write_to_frame(sprite.pos_x + x, sprite.pos_y + y, color);
+            if (color == BLACK) { // Use black as transparency for sprites only
+                continue;
             }
-            else if (color != TRANSPARENT && sprite.flip_x && !sprite.flip_y) {
-                write_to_frame(sprite.pos_x + sprite.width - 1 - x, sprite.pos_y + y, color);
+
+            int16_t pos_x, pos_y;
+            if (sprite.flip_x) {
+                pos_x = sprite.pos_x + sprite.width - 1 - x;
             }
-            else if (color != TRANSPARENT && !sprite.flip_x && sprite.flip_y) {
-                write_to_frame(sprite.pos_x + x, sprite.pos_y + sprite.height - 1 - y, color);
+            else {
+                pos_x = sprite.pos_x + x;
             }
-            else if (color != TRANSPARENT && sprite.flip_x && sprite.flip_y) {
-                write_to_frame(sprite.pos_x + sprite.width - 1 - x, sprite.pos_y + sprite.height - 1 - y, color);
+            if (sprite.flip_y) {
+                pos_y = sprite.pos_y + sprite.height - 1 - y;
             }
+            else {
+                pos_y = sprite.pos_y + y;
+            }
+
+            if (sprite.CW_90) {
+                pos_x = sprite.pos_x + sprite.height - 1 - y;
+                pos_y = sprite.pos_y + x;
+            }
+            else if (sprite.ACW_90) {
+                pos_x = sprite.pos_x + y;
+                pos_y = sprite.pos_y + sprite.width - 1 - x;
+            }
+
+            write_to_frame(pos_x, pos_y, color, sprite.alpha);
         }
     }
 }

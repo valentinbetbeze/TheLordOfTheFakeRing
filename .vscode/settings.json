@@ -42,6 +42,9 @@
         "timer_group_reg.h": "c",
         "thread": "c",
         "bitset": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "esp_random.h": "c",
+        "math.h": "c",
+        "random": "c"
     }
 }

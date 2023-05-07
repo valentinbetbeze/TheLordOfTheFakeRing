@@ -112,12 +112,7 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
     // Check if the object is within any potential collision area
     uint8_t x_offset = (physics->pos_x + map_x) % BLOCK_SIZE;
     uint8_t y_offset = physics->pos_y % BLOCK_SIZE;
-    struct {
-        uint8_t left :      1;
-        uint8_t right :     1;
-        uint8_t top :       1;
-        uint8_t bottom :    1;
-    } collision_risk = {
+    struct {uint8_t left : 1; uint8_t right : 1; uint8_t top : 1; uint8_t bottom : 1;} collision_risk = {
         .left   = ((uint8_t)BLOCK_SIZE - physics->speed_x - SLIP_OFFSET <= x_offset),
         .right  = (1 <= x_offset && x_offset <= physics->speed_x + SLIP_OFFSET),
         .top    = ((uint8_t)BLOCK_SIZE / 2 < y_offset && y_offset <= BLOCK_SIZE - 1),
@@ -137,36 +132,34 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
     int8_t block_bl = map[ref_row][ref_col - 1];       // bottom-left block
     int8_t block_br = map[ref_row + 1][ref_col - 1];   // bottom-right block
     // Check for collisions
-    struct {
-        uint8_t left :      1;
-        uint8_t right :     1;
-        uint8_t top :       1;
-        uint8_t bottom :    1;
-    } collision = {
-        .left   = (collision_risk.left && IS_SOLID(block_tl) && 
-                  !is_block_destroyed(ref_row, ref_col)) ||
-                  (collision_risk.left && y_offset && IS_SOLID(block_bl) && 
-                  !is_block_destroyed(ref_row, ref_col - 1) &&
-                  (!IS_SOLID(block_br) || is_block_destroyed(ref_row + 1, ref_col - 1))),
+    struct {uint8_t left : 1; uint8_t right : 1; uint8_t top : 1; uint8_t bottom : 1;} collision;
+    collision.top =         (collision_risk.top && IS_SOLID(block_tl) &&
+                            !is_block_destroyed(ref_row, ref_col) &&
+                            x_offset < BLOCK_SIZE - physics->speed_x - SLIP_OFFSET) ||
+                            (collision_risk.top && physics->speed_x + SLIP_OFFSET < x_offset &&
+                            IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col));
 
-        .right  = (collision_risk.right && IS_SOLID(block_tr) && 
-                  !is_block_destroyed(ref_row + 1, ref_col)) ||
-                  (collision_risk.right && y_offset && IS_SOLID(block_br) && 
-                  !is_block_destroyed(ref_row + 1, ref_col - 1) &&
-                  (!IS_SOLID(block_bl) || is_block_destroyed(ref_row, ref_col - 1))),
+    collision.bottom =      (collision_risk.bottom && IS_SOLID(block_bl) &&
+                            !is_block_destroyed(ref_row, ref_col - 1) &&
+                            x_offset < BLOCK_SIZE - physics->speed_x) ||
+                            (collision_risk.bottom && physics->speed_x < x_offset &&
+                            IS_SOLID(block_br) && !is_block_destroyed(ref_row + 1, ref_col - 1));
 
-        .top    = (collision_risk.top && IS_SOLID(block_tl) &&
-                  !is_block_destroyed(ref_row, ref_col) &&
-                  x_offset < BLOCK_SIZE - physics->speed_x - SLIP_OFFSET) ||
-                  (collision_risk.top &&  physics->speed_x + SLIP_OFFSET < x_offset && IS_SOLID(block_tr) &&
-                  !is_block_destroyed(ref_row + 1, ref_col)),
+    collision.left =        collision_risk.left && IS_SOLID(block_tl) && 
+                            !is_block_destroyed(ref_row, ref_col);
 
-        .bottom = (collision_risk.bottom && IS_SOLID(block_bl) && 
-                  !is_block_destroyed(ref_row, ref_col - 1) &&
-                  x_offset < BLOCK_SIZE - physics->speed_x) || 
-                  (collision_risk.bottom && physics->speed_x < x_offset && IS_SOLID(block_br) &&
-                  !is_block_destroyed(ref_row + 1, ref_col - 1)),
-    };
+    collision.right =       collision_risk.right && IS_SOLID(block_tr) && 
+                            !is_block_destroyed(ref_row + 1, ref_col);
+
+    if (physics->jumping || physics->falling) {
+        collision.left |=   (collision_risk.left && y_offset && IS_SOLID(block_bl) && 
+                            !is_block_destroyed(ref_row, ref_col - 1) &&
+                            (!IS_SOLID(block_br) || is_block_destroyed(ref_row + 1, ref_col - 1)));
+
+        collision.right |=  (collision_risk.right && y_offset && IS_SOLID(block_br) && 
+                            !is_block_destroyed(ref_row + 1, ref_col - 1) &&
+                            (!IS_SOLID(block_bl) || is_block_destroyed(ref_row, ref_col - 1)));
+    }
     // Apply collisions
     if (collision.left) {
         physics->left_collision = 1;
@@ -315,6 +308,32 @@ void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t 
 /*************************************************
  * Items
  *************************************************/
+
+item_t generate_item(int16_t row, int8_t column, uint16_t map_x)
+{
+    uint8_t random = esp_random() % 100;
+    item_t item = {
+        .spawned = 1,
+        .sprite.height = BLOCK_SIZE,
+        .sprite.width = BLOCK_SIZE,
+        .sprite.pos_x = BLOCK_SIZE * (row - 1) - map_x,
+        .sprite.pos_y = LCD_HEIGHT - (BLOCK_SIZE * (column + 1)),
+    };
+    if (random < 100) {
+        item.type = LIGHTSTAFF;
+        item.sprite.data = sprite_lightstaff;
+    }
+    else if (random < 10) {
+        item.type = SHIELD;
+        item.sprite.data = sprite_shield;
+    }
+    else {
+        item.type = COIN;
+        item.sprite.data = sprite_coin_1;
+    }
+    return item;
+}
+
 
 uint8_t store_item(item_t item)
 {

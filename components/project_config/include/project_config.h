@@ -10,6 +10,7 @@
 #ifndef __PROJECT_CONFIG_H__
 #define __PROJECT_CONFIG_H__
 
+#include <math.h>
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
@@ -41,7 +42,7 @@
 #define LCD_MV              0x00
 #define LCD_MX              0x00            // X-Mirror                
 #define LCD_MY              0x01            // Y-Mirror                
-#define LCD_GAMMA           0x01            // Gamma Curve 0           
+#define LCD_GAMMA           0x08            // Gamma Curve 4           
 
 #if (LCD_MEMORY_BASE == 0b00)
     #define LCD_HEIGHT      (132)           /* pixels */
@@ -55,6 +56,7 @@
 #else
     #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
 #endif
+#define LCD_SIZE            hypot(LCD_HEIGHT, LCD_WIDTH)
 
 #define PWM_LCD_GROUP       LEDC_TIMER_0
 #define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
@@ -115,39 +117,39 @@
  ************************************************/
 
 // All blocks > 0 are solid, else they are not.
+#define NUM_BLOCK_RECORDS       10
+#define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
+#define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
 #define BACKGROUND_BLOCK        (0)
 #define NON_BREAKABLE_BLOCK     (1)
 #define BREAKABLE_BLOCK         (2)
 #define BONUS_BLOCK             (3)
 
+#define NUM_ENEMY_RECORDS       10
+#define TIMESTEP_ENEMY          15          // in milliseconds
+#define KILL_ZONE_Y             5           // Height, in pixels, in which an enemy is killed
 #define ENEMY_1                 (-30)
 #define ENEMY_2                 (-31)
 #define ENEMY_3                 (-32)
 
-#define GOLD                    (1)
-#define FIRESTAFF               (2)
+#define NUM_ITEMS               NUM_BLOCK_RECORDS
+#define TIMESTEP_BUMP_COIN      5           // in milliseconds
+#define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
+#define SHIELD_ALPHA            0.5         // Shield color transparency
+#define COIN                    (1)
+#define LIGHTSTAFF              (2)
 #define SHIELD                  (3)
+
+#define SPEED_INITIAL           1
+#define SPEED_JUMP_INIT         2
+#define SLIP_OFFSET             2           // Left/right slip offset, in pixels
+#define TIMESTEP_ACCEL          200         // in milliseconds
 
 #define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
 #define IS_INTERACTIVE(x)       (x > NON_BREAKABLE_BLOCK)
 #define IS_ENEMY(x)             (x <= ENEMY_1)
 #define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
 #define MAP_ID(x)               (x[0][0])
-
-#define NUM_BLOCK_RECORDS       10
-#define NUM_ENEMY_RECORDS       10
-#define NUM_ITEMS               NUM_BLOCK_RECORDS
-#define SPEED_INITIAL           1
-#define SPEED_JUMP_INIT         2
-#define SLIP_OFFSET             2           // Left/right slip offset, in pixels
-#define TIMESTEP_ACCEL          200         // in milliseconds
-#define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
-#define TIMESTEP_BUMP_COIN      5           // in milliseconds
-#define TIMESTEP_ENEMY          10          // in milliseconds
-#define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
-#define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
-#define KILL_ZONE_Y             5           // Height, in pixels, in which an enemy is killed
-
 
 
 #endif // __PROJECT_CONFIG_H__

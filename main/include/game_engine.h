@@ -17,6 +17,7 @@
 #include "maps.h"
 #include "fonts.h"
 #include "sprites.h"
+#include "esp_random.h"
 
 /*************************************************
  * Data structures
@@ -38,12 +39,6 @@ typedef struct {
 } physics_t;
 
 typedef struct {
-    uint8_t bumping :           1;
-    uint8_t steps;
-    uint32_t timer;
-} animation_t;
-
-typedef struct {
     uint8_t is_hit :            1;
     uint8_t destroyed :         1;
     uint8_t item_given :        1;
@@ -53,7 +48,7 @@ typedef struct {
 } block_t;
 
 typedef struct {
-    uint8_t life;
+    int8_t life;
     int16_t row;
     int8_t column;
     uint32_t timer_x;
@@ -64,16 +59,20 @@ typedef struct {
 typedef struct {
     uint8_t spawned :           1;
     uint8_t taken :             1;
-    animation_t animation;
+    uint8_t type;
+    uint8_t steps;
+    uint32_t timer;
     sprite_t sprite;
 } item_t;
+
 
 typedef struct {
     uint8_t life :              4;
     uint8_t shield :            1;
-    uint8_t firestaff :         1;
-    uint8_t mount :             1;
-    uint8_t free_flag :         1;
+    uint8_t lightstaff :        1;
+    uint8_t forward :           1;
+    uint8_t power_used :        1;
+    uint16_t spell_radius;
     uint32_t timer;
     physics_t physics;
     sprite_t sprite;
@@ -119,7 +118,11 @@ enemy_t *get_enemy_record(int16_t row, int8_t column);
 
 void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t end_row, uint16_t map_row);
 
+item_t generate_item(int16_t row, int8_t column, uint16_t map_x);
+
 uint8_t store_item(item_t item);
+
+void animate_coin(item_t *item, uint8_t *score, uint64_t timer);
 
 
 #endif // __GAME_ENGINE_H__
