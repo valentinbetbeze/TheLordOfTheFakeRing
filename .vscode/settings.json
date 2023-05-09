@@ -45,6 +45,9 @@
         "algorithm": "c",
         "esp_random.h": "c",
         "math.h": "c",
-        "random": "c"
+        "random": "c",
+        "stdint.h": "c",
+        "stdio.h": "c",
+        "stdint-gcc.h": "c"
     }
 }

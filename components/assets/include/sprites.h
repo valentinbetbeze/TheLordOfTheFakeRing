@@ -20,14 +20,18 @@
  *************************************************/
 extern const uint16_t sprite_player[BLOCK_SIZE*BLOCK_SIZE];
 
+extern const uint16_t shire_block_water[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_block_1[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t shire_block_1_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_block_2[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_block_3[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t shire_block_3_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_enemy_1[BLOCK_SIZE*BLOCK_SIZE];
 
 extern const uint16_t moria_block_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t moria_block_2[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t moria_block_3[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t moria_enemy_1[BLOCK_SIZE*BLOCK_SIZE];
 
 extern const uint16_t sprite_coin_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_coin_2[BLOCK_SIZE*BLOCK_SIZE];

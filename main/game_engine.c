@@ -65,8 +65,13 @@ uint8_t create_block_record(block_t block, uint16_t map_row)
             free_slot_found = 1;
         }
         // If the block is not in the frame anymore, clean the slot and write over it
-        else if (!free_slot_found && block.row < map_row) {
-            memset(&blocks[index], 0, sizeof(blocks[index]));
+        else if (!free_slot_found && blocks[i].row < map_row) {
+            blocks[i].row          = -1; // Empty slot identifier
+            blocks[i].column       = -1;
+            blocks[i].is_hit       = 0;
+            blocks[i].destroyed    = 0;
+            blocks[i].item_given   = 0;
+            blocks[i].bumping      = 0;
             index = i;
         }
     }
@@ -113,10 +118,10 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
     uint8_t x_offset = (physics->pos_x + map_x) % BLOCK_SIZE;
     uint8_t y_offset = physics->pos_y % BLOCK_SIZE;
     struct {uint8_t left : 1; uint8_t right : 1; uint8_t top : 1; uint8_t bottom : 1;} collision_risk = {
-        .left   = ((uint8_t)BLOCK_SIZE - physics->speed_x - SLIP_OFFSET <= x_offset),
-        .right  = (1 <= x_offset && x_offset <= physics->speed_x + SLIP_OFFSET),
+        .left   = ((uint8_t)BLOCK_SIZE - physics->speed_x - SLIP_OFFSET <= x_offset && physics->pos_y > 0),
+        .right  = (1 <= x_offset && x_offset <= physics->speed_x + SLIP_OFFSET && physics->pos_y > 0),
         .top    = ((uint8_t)BLOCK_SIZE / 2 < y_offset && y_offset <= BLOCK_SIZE - 1),
-        .bottom = (1 <= y_offset && y_offset < (uint8_t)BLOCK_SIZE / 2),
+        .bottom = (1 <= y_offset && y_offset < (uint8_t)BLOCK_SIZE / 2 && physics->pos_y < LCD_HEIGHT - BLOCK_SIZE),
     };
     // If no collision risk, abort
     if (!collision_risk.left && !collision_risk.right && !collision_risk.top && !collision_risk.bottom) {
@@ -135,14 +140,14 @@ uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *phys
     struct {uint8_t left : 1; uint8_t right : 1; uint8_t top : 1; uint8_t bottom : 1;} collision;
     collision.top =         (collision_risk.top && IS_SOLID(block_tl) &&
                             !is_block_destroyed(ref_row, ref_col) &&
-                            x_offset < BLOCK_SIZE - physics->speed_x - SLIP_OFFSET) ||
-                            (collision_risk.top && physics->speed_x + SLIP_OFFSET < x_offset &&
+                            x_offset < BLOCK_SIZE - abs(physics->speed_x) - SLIP_OFFSET) ||
+                            (collision_risk.top && abs(physics->speed_x) + SLIP_OFFSET < x_offset &&
                             IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col));
 
     collision.bottom =      (collision_risk.bottom && IS_SOLID(block_bl) &&
                             !is_block_destroyed(ref_row, ref_col - 1) &&
-                            x_offset < BLOCK_SIZE - physics->speed_x) ||
-                            (collision_risk.bottom && physics->speed_x < x_offset &&
+                            x_offset < BLOCK_SIZE - abs(physics->speed_x)) ||
+                            (collision_risk.bottom && abs(physics->speed_x) < x_offset &&
                             IS_SOLID(block_br) && !is_block_destroyed(ref_row + 1, ref_col - 1));
 
     collision.left =        collision_risk.left && IS_SOLID(block_tl) && 
@@ -246,7 +251,7 @@ void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_r
     enemy->physics.jumping          = 0;
     enemy->physics.pos_x            = BLOCK_SIZE * (row - map_row);
     enemy->physics.pos_y            = BLOCK_SIZE * (NUM_BLOCKS_Y - 1 - column);
-    enemy->physics.speed_x          = SPEED_INITIAL;
+    enemy->physics.speed_x          = -1 * SPEED_INITIAL;
     enemy->physics.speed_y          = SPEED_INITIAL;
 }
 
@@ -319,11 +324,11 @@ item_t generate_item(int16_t row, int8_t column, uint16_t map_x)
         .sprite.pos_x = BLOCK_SIZE * (row - 1) - map_x,
         .sprite.pos_y = LCD_HEIGHT - (BLOCK_SIZE * (column + 1)),
     };
-    if (random < 100) {
+    if (random < 3) {
         item.type = LIGHTSTAFF;
         item.sprite.data = sprite_lightstaff;
     }
-    else if (random < 10) {
+    else if (random < 6) {
         item.type = SHIELD;
         item.sprite.data = sprite_shield;
     }

@@ -1,23 +1,15 @@
 #include "st7735s_graphics.h"
 
-
 /**
- * @brief Write a pixel of information to the frame, taking the
- * cartesian coordinates of the display as input.
+ * @brief Get the frame indexes object
  * 
- * @param x Position of the pixel on the x-axis (along width)
- * @param y Position of the pixel on the y-axis (along height)
- * @param data Color of the pixel
- * @param transparency Transparency to apply. 0 means no transparency, 1 means full transparency.
+ * @param x 
+ * @param y 
+ * @param row 
+ * @param column 
  */
-static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
+static void get_frame_indexes(int16_t x, int16_t y, uint16_t *row, uint16_t *column)
 {
-    // Do not write if out of display's resolution
-    if (x < 0 || LCD_WIDTH <= x || y < 0 || LCD_HEIGHT <= y ) {
-        return;
-    }
-
-    uint16_t row, column;
     /*
      Compute the amount of pixels to get to the pixel of position
      (x, y). This parameter is required to figure out which row/column
@@ -33,8 +25,8 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
      Result: (0, 62) -> frame[1][30]
     */
     if (remainder) {
-        row = quotient;
-        column = remainder - 1;
+        *row = quotient;
+        *column = remainder - 1;
     }
     /*
      Case B : display pixel (x, y): (0, 63) -> npixel  = 64 pixels
@@ -46,9 +38,52 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
      Result: (0, 63) -> frame[1][31]
     */
     else {
-        row = quotient - 1;
-        column = PX_PER_TRANSACTION - 1;
+        *row = quotient - 1;
+        *column = PX_PER_TRANSACTION - 1;
     }
+}
+
+
+/**
+ * @brief 
+ * 
+ * @param x 
+ * @param y 
+ * @return uint16_t 
+ */
+static uint16_t read_from_frame(int16_t x, int16_t y)
+{
+    if (x < 0 || LCD_WIDTH <= x || y < 0 || LCD_HEIGHT <= y ) {
+        printf("Error(read_from_frame): (x, y) coordinates are out of the frame.\n");
+        return 1;
+    }
+    uint16_t row, column;
+    get_frame_indexes(x, y, &row, &column);
+
+    return SPI_SWAP_DATA_TX(frame[row][column], 16);
+}
+
+
+/**
+ * @brief Write a pixel of information to the frame, taking the
+ * cartesian coordinates of the display as input.
+ * 
+ * @param x Position of the pixel on the x-axis (along width)
+ * @param y Position of the pixel on the y-axis (along height)
+ * @param color Color of the pixel
+ * @param alpha Transparency of the pixel. 0 means no transparency, 1 means full transparency.
+ * 
+ * @note The @p color parameter shall be in big-endian format.
+ */
+static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
+{
+    // Do not write if out of display's resolution
+    if (x < 0 || LCD_WIDTH <= x || y < 0 || LCD_HEIGHT <= y ) {
+        return;
+    }
+
+    uint16_t row, column;
+    get_frame_indexes(x, y, &row, &column);
 
     // Do not write if out of the fram's range
     if ((NUM_TRANSACTIONS <= row) || (PX_PER_TRANSACTION <= column)) {
@@ -81,6 +116,40 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
 
 
 /**
+ * @brief 
+ * 
+ * @param color 
+ * @return uint8_t 
+ */
+static uint8_t is_color_dark(uint16_t color)
+{
+    uint8_t r = (color >> 11) & 0x1F;
+    uint8_t g = (color >> 5) & 0x3F;
+    uint8_t b = color & 0x1F;
+    // https://en.wikipedia.org/wiki/Luma_(video)#Rec._601_luma_versus_Rec._709_luma_coefficients
+    float luma = sqrt(0.299 * r * r + 0.587 * g * g + 0.114 * b * b);
+    // Check if the perceived brightness is below the threshold
+    return (luma < PERCEIVED_BRIGHTNESS_THRESHOLD);
+}
+
+
+/**
+ * @brief 
+ * 
+ * @param background 
+ * @param color 
+ * @return uint16_t 
+ */
+static uint16_t adapt_color(uint16_t background, uint16_t color)
+{
+    if (is_color_dark(background)) {
+        color = WHITE;
+    }
+    return color;
+}
+
+
+/**
  * @brief Rasterize 1 point-per-octant of a circle, for all
  * 8 octants.
  * 
@@ -105,22 +174,6 @@ static void rasterize_circle(circle_t circle, uint8_t x, uint8_t y)
     write_to_frame((int16_t)circle.pos_x - y, (int16_t)circle.pos_y - x, circle.color, circle.alpha);
     write_to_frame((int16_t)circle.pos_x - y, (int16_t)circle.pos_y + x, circle.color, circle.alpha);
     write_to_frame((int16_t)circle.pos_x - x, (int16_t)circle.pos_y + y, circle.color, circle.alpha);
-}
-
-
-uint16_t st7735s_rgb565(uint32_t rgb888)
-{
-    // Convert each color in the new format
-    uint8_t red = (uint8_t) (((rgb888 >> 16) * 31) / 255);
-    uint8_t green = (uint8_t) (((rgb888 >> 8 & 0xFF) * 63) / 255);
-    uint8_t blue = (uint8_t) (((rgb888 & 0xFF) * 31) / 255);
-    // Compile in one code
-    uint16_t rgb565 = ((red << 11) & RED) | ((green << 5) & GREEN) | (blue & BLUE);
-    /*
-     Swap data to send MSB first (required for compatibility with ST7735S).
-     See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html#transactions-with-integers-other-than-uint8-t
-    */
-    return rgb565;
 }
 
 
@@ -175,41 +228,70 @@ void st7735s_draw_circle(circle_t circle)
 void st7735s_draw_text(text_t text)
 {
     uint8_t px_pos_x, px_pos_y, offset = 0;
-
-    for (int text_index = 0; text_index < text.size; text_index++) {
-        // End of text
-        if (text.data[text_index] == '\0') {
+    for (uint8_t char_index = 0; char_index < text.size; char_index++) {
+        if (text.data[char_index] == '\0') {
             break;
         }
-        // New line
-        else if (text.data[text_index] == '\n') {
+        else if (text.data[char_index] == '\n') {
             text.pos_y += FONT_SIZE + TEXT_PADDING_Y;
-            offset = text_index + 1;
+            offset = char_index + 1;
         }
-        else if (text.data[text_index] < FIRST_ASCII ||
-                 text.data[text_index] > LAST_ASCII) {
+        else if (text.data[char_index] < FIRST_ASCII ||
+                 text.data[char_index] > LAST_ASCII) {
             printf("Error: `%c`(0x%x) has no font sprite.\n",
-            text.data[text_index], text.data[text_index]);
+            text.data[char_index], text.data[char_index]);
         }
         else {
-            /*
-             Using the character ascii code (ex:65 for 'A'), get the
+            /* Using the character ascii code (ex:65 for 'A'), get the
              corresponding letter sprite and iterate through each layer
-             of the sprite.
-            */
-            uint8_t char_index = text.data[text_index]-FIRST_ASCII;
+             of the sprite. */
+            uint8_t sprite_index = text.data[char_index]-FIRST_ASCII;
 
-            for (int layer_index = 0; layer_index < FONT_SIZE; layer_index++) {
-                uint8_t layer = myFont[char_index][layer_index];
+            for (uint8_t layer_index = 0; layer_index < FONT_SIZE; layer_index++) {
+                uint8_t layer = myFont[sprite_index][layer_index];
                 px_pos_y = text.pos_y + layer_index;
-
                 // Extract each bit from bit field and write the pixel to the frame
-                for (int bit = FONT_SIZE - 1; bit >= 0; bit--) {
-                    if ((layer >> bit) & 1) {
-                        px_pos_x    = text.pos_x
-                                    + (text_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
-                                    + (FONT_SIZE - 1 - bit);
+                for (int8_t bit = FONT_SIZE - 1; bit >= 0; bit--) {
+                    px_pos_x    = text.pos_x
+                                + (char_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
+                                + (FONT_SIZE - 1 - bit);
+                    if (((layer >> bit) & 1) && text.adaptive) {
+                        uint16_t bg_color = read_from_frame(px_pos_x, px_pos_y);
+                        uint16_t color = adapt_color(bg_color, text.color);
+                        write_to_frame(px_pos_x, px_pos_y, SPI_SWAP_DATA_TX(color, 16), text.alpha);
+                    }
+                    else if ((layer >> bit) & 1) {
                         write_to_frame(px_pos_x, px_pos_y, text.color, text.alpha);
+                    }
+                    else if (text.background) {
+                        write_to_frame(px_pos_x, px_pos_y, text.background, text.alpha);
+                    }
+                }
+                // Fill background on x-padding
+                if (text.background) {
+                    for (uint8_t i = 0; i < TEXT_PADDING_X; i++) {
+                        px_pos_x =  text.pos_x
+                                    + (char_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
+                                    - i - 1;
+                        write_to_frame(px_pos_x, px_pos_y, text.background, text.alpha);
+                        px_pos_x =  text.pos_x
+                                    + (char_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
+                                    + FONT_SIZE + i;
+                        write_to_frame(px_pos_x, px_pos_y, text.background, text.alpha);
+                    }
+                }
+            }
+            // Fill background on y-padding
+            if (text.background) {
+                for (uint8_t i = 0; i < TEXT_PADDING_Y; i++) {
+                    for (uint8_t j = 0; j < FONT_SIZE + 2 * TEXT_PADDING_X; j++) {
+                        px_pos_x =  text.pos_x
+                                    + (char_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
+                                    - TEXT_PADDING_X + j;
+                        px_pos_y = text.pos_y - i - 1;
+                        write_to_frame(px_pos_x, px_pos_y, text.background, text.alpha);
+                        px_pos_y = text.pos_y + FONT_SIZE + i;
+                        write_to_frame(px_pos_x, px_pos_y, text.background, text.alpha);
                     }
                 }
             }

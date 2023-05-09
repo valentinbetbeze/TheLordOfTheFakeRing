@@ -23,6 +23,8 @@
 #include "fonts.h"
 
 
+#define PERCEIVED_BRIGHTNESS_THRESHOLD 45
+
 /*************************************************
  * Color codes (RGB565)
  ************************************************/
@@ -77,11 +79,15 @@ typedef struct {
  */
 typedef struct {
     uint8_t pos_x;          // Top-left x-position    
-    uint8_t pos_y;          // Top-left y-position    
-    uint16_t color;         // 16-bit format          
+    uint8_t pos_y;          // Top-left y-position
+    uint8_t adaptive;       /* Make the text color adaptive to its environment
+                               Light on dark background
+                               Dark on light background */
+    uint16_t background;    // Background color, 0 for no background
+    uint16_t color;         // Text color (16-bit format)
+    float alpha;      
     uint8_t size;           // Text size in bytes     
     const char *data;       // Ptr to char array
-    float alpha;
 } text_t;
 
 /**
@@ -104,14 +110,6 @@ typedef struct {
 /*************************************************
  * Prototypes
  *************************************************/
-
-/**
- * @brief Convert a RGB888 color code (24-bit) to RGB565 (16-bit)
- * 
- * @param rgb888 24-bit color code
- * @return The corresponding 16-bit color code
- */
-uint16_t st7735s_rgb565(uint32_t rgb888);
 
 /**
  * @brief Fill the background color of the frame.

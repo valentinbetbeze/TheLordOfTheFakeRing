@@ -40,7 +40,7 @@ struct {
     .playing    = 1,
     .cam_moving = 0,
     .map_id     = 0,
-    .map_x      = 0,    // First pixel x-coordinate of the current map frame
+    .map_x      = 0,     // First pixel x-coordinate of the current map frame
     .map_row    = 1,    // First row of the current map frame
     .timer      = 0,
 };
@@ -116,6 +116,10 @@ void app_main()
      * Game initialization
      *************************************************/
 #pragma region
+    const int8_t (*map)[NUM_BLOCKS_Y] = moria;
+    game.map_id = MAP_ID(map);
+    game.map_x = (game.map_row - 1) * BLOCK_SIZE;
+
     // Setup game text objects
     const char coins_text[] = "COINS: ";
     const text_t coins_text_object = {
@@ -123,7 +127,8 @@ void app_main()
         .pos_y = 5,
         .size = sizeof(coins_text),
         .data = coins_text,
-        .color = BLACK
+        .color = BLACK,
+        .adaptive = 1
     };
     char num_coins_text[4] = {'\0'};
     const text_t coins_object = {
@@ -131,7 +136,8 @@ void app_main()
         .pos_y = 5,
         .size = sizeof(num_coins_text),
         .data = num_coins_text,
-        .color = BLACK
+        .color = BLACK,
+        .adaptive = 1
     };
     const char life_text[] = "LIFE: ";
     const text_t life_text_object = {
@@ -139,7 +145,8 @@ void app_main()
         .pos_y = 5,
         .size = sizeof(life_text),
         .data = life_text,
-        .color = BLACK
+        .color = BLACK,
+        .adaptive = 1
     };
     char num_life_text[3] = {'\0'};
     const text_t life_object = {
@@ -147,18 +154,17 @@ void app_main()
         .pos_y = 5,
         .size = sizeof(num_life_text),
         .data = num_life_text,
-        .color = BLACK
+        .color = BLACK,
+        .adaptive = 1
     };
 
-    const int8_t (*map)[NUM_BLOCKS_Y] = shire;
-    game.map_id = MAP_ID(map);
     character_t player = {
         .life               = 3,
         .lightstaff         = 0,
         .shield             = 0,
         .forward            = 1,
-        .physics.pos_x      = BLOCK_SIZE,
-        .physics.pos_y      = LCD_HEIGHT - 2 * BLOCK_SIZE,
+        .physics.pos_x      = 0,
+        .physics.pos_y      = BLOCK_SIZE,
         .physics.speed_x    = SPEED_INITIAL,
         .physics.speed_y    = SPEED_INITIAL,
         .sprite.height      = BLOCK_SIZE,
@@ -168,7 +174,7 @@ void app_main()
 
     initialize_blocks_records();
     // Create the enemies appearing in the very first frame of the map
-    spawn_enemies(map, 1, NUM_BLOCKS_X + 1, game.map_row);
+    spawn_enemies(map, game.map_row, game.map_row + NUM_BLOCKS_X + 1, game.map_row);
 #pragma endregion
 
     while(game.playing) {
@@ -206,6 +212,8 @@ void app_main()
             player.physics.bottom_collision     = 0;
             player.physics.left_collision       = 0;
             player.physics.right_collision      = 0;
+            // Reset block states
+            initialize_blocks_records();
             // Reset enemy records
             for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
                 memset(&enemies[i], 0, sizeof(enemies[i]));
@@ -311,7 +319,11 @@ void app_main()
         spawn_enemies(map, game.map_row + NUM_BLOCKS_X, game.map_row + NUM_BLOCKS_X + 3,game.map_row);
         // Apply dynamics to each living enemy
         for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-            if (enemies[i].life == 0 || enemies[i].physics.pos_x < -BLOCK_SIZE) {
+            if (enemies[i].life == 0) {
+                continue;
+            }
+            else if (enemies[i].physics.pos_x < -LCD_WIDTH || enemies[i].physics.pos_y > LCD_HEIGHT) {
+                enemies[i].life = 0;
                 continue;
             }
             // Check if falling
@@ -322,13 +334,18 @@ void app_main()
                 enemies[i].physics.falling = 0;
                 enemies[i].physics.speed_y = SPEED_INITIAL;
             }
+            // Update x-direction
+            if (!enemies[i].physics.falling && 
+               (enemies[i].physics.left_collision || enemies[i].physics.right_collision)) {
+                enemies[i].physics.speed_x = -1 * enemies[i].physics.speed_x;
+            }
             // Update x-position
-            if (game.cam_moving) {
-                enemies[i].physics.pos_x -= 2 * enemies[i].physics.speed_x;
+            if (game.cam_moving && enemies[i].physics.speed_x < 0) {
+                enemies[i].physics.pos_x += 2 * enemies[i].physics.speed_x;
                 enemies[i].timer_x = (uint32_t)game.timer;
             }
             else if ((game.timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) {
-                enemies[i].physics.pos_x -= enemies[i].physics.speed_x;
+                enemies[i].physics.pos_x += enemies[i].physics.speed_x;
                 enemies[i].timer_x = (uint32_t)game.timer;
             }
             // Update y-position
@@ -540,10 +557,43 @@ void app_main()
                     .pos_y = column * BLOCK_SIZE
                 };
                 switch (block_type) {
-                    case NON_BREAKABLE_BLOCK:
+                    case CUSTOM_SPRITE_3:
+                        switch (game.map_id) {
+                            case 1: 
+                                rectangle_t rectangle = {
+                                    .height = BLOCK_SIZE,
+                                    .width = BLOCK_SIZE,
+                                    .pos_x = (row - 1) * BLOCK_SIZE - game.map_x,
+                                    .pos_y = column * BLOCK_SIZE,
+                                    .color = BLACK
+                                };
+                                st7735s_draw_rectangle(rectangle);
+                                break;
+                            default: break;
+                        }
+                        break;
+                    case CUSTOM_SPRITE_2:
+                        switch (game.map_id) {
+                            case 1: sprite.data = moria_block_1; break;
+                            default: break;
+                        }
+                        break;
+                    case CUSTOM_SPRITE_1:
+                        switch (game.map_id) {
+                            case 1: sprite.data = shire_block_water; break;
+                            default: break;
+                        }
+                        break;
+                    case NON_BREAKABLE_BLOCK_1:
                         switch (game.map_id) {
                             case 1: sprite.data = shire_block_1; break;
                             case 2: sprite.data = moria_block_1; break;
+                            default: break;
+                        }
+                        break;
+                    case NON_BREAKABLE_BLOCK_2:
+                        switch (game.map_id) {
+                            case 1: sprite.data = shire_block_1_1; break;
                             default: break;
                         }
                         break;
@@ -559,7 +609,14 @@ void app_main()
                             bump_block(block, &sprite, game.timer);
                         }
                         switch (game.map_id) {
-                            case 1: sprite.data = shire_block_3; break;
+                            case 1: 
+                                if (block != NULL && block->item_given) {
+                                    sprite.data = shire_block_3_1;
+                                }
+                                else {
+                                    sprite.data = shire_block_3;
+                                }
+                                break;
                             case 2: sprite.data = moria_block_3; break;
                             default: break;
                         }
@@ -584,10 +641,14 @@ void app_main()
                 .pos_x = enemies[i].physics.pos_x,
                 .pos_y = enemies[i].physics.pos_y
             };
+            if (enemies[i].physics.speed_x > 0) {
+                sprite.flip_x = 1;
+            }
             switch(map[enemies[i].row][enemies[i].column]) {
                 case ENEMY_1:
                     switch (game.map_id) {
                         case 1: sprite.data = shire_enemy_1; break;
+                        case 2: sprite.data = moria_enemy_1; break;
                         default: break;
                     }
                     break;

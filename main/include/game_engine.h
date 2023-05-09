@@ -11,6 +11,7 @@
 #define __GAME_ENGINE_H__
 
 #include <string.h>
+#include <math.h>
 
 #include "project_config.h"
 #include "st7735s_graphics.h"
@@ -34,8 +35,8 @@ typedef struct {
     uint8_t free_flag :         1;
     int16_t pos_x;
     int16_t pos_y;
-    uint8_t speed_x;
-    uint8_t speed_y;
+    int8_t speed_x;
+    int8_t speed_y;
 } physics_t;
 
 typedef struct {
