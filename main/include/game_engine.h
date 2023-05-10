@@ -20,6 +20,7 @@
 #include "sprites.h"
 #include "esp_random.h"
 
+
 /*************************************************
  * Data structures
  *************************************************/
@@ -29,10 +30,10 @@ typedef struct {
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
     uint8_t right_collision :   1;
+    uint8_t grounded :          1;      // Cannot fall or jump
     uint8_t falling :           1;
     uint8_t jumping :           1;
     uint8_t accelerating :      1;
-    uint8_t free_flag :         1;
     int16_t pos_x;
     int16_t pos_y;
     int8_t speed_x;
@@ -48,6 +49,17 @@ typedef struct {
     int8_t column;
 } block_t;
 
+typedef enum {
+    CUSTOM_SPRITE_1 =           (-1),
+    CUSTOM_SPRITE_2 =           (-2),
+    CUSTOM_SPRITE_3 =           (-3),
+    BACKGROUND_BLOCK =          (0),
+    NON_BREAKABLE_BLOCK_1 =     (1),
+    NON_BREAKABLE_BLOCK_2 =     (2),
+    BREAKABLE_BLOCK =           (3),
+    BONUS_BLOCK =               (4)
+} block_type_t;
+
 typedef struct {
     int8_t life;
     int16_t row;
@@ -56,6 +68,12 @@ typedef struct {
     uint32_t timer_y;
     physics_t physics;
 } enemy_t;
+
+typedef enum {
+    ENEMY_1 =                   (-30),
+    ENEMY_2 =                   (-31),
+    ENEMY_3 =                   (-32),
+} enemy_type_t;
 
 typedef struct {
     uint8_t spawned :           1;
@@ -66,6 +84,11 @@ typedef struct {
     sprite_t sprite;
 } item_t;
 
+typedef enum {
+    COIN =                      (1),
+    LIGHTSTAFF =                (2),
+    SHIELD =                    (3),
+} item_type_t;
 
 typedef struct {
     uint8_t life :              4;
@@ -78,6 +101,17 @@ typedef struct {
     physics_t physics;
     sprite_t sprite;
 } character_t;
+
+
+/*************************************************
+ * Macros
+ *************************************************/
+
+#define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
+#define IS_INTERACTIVE(x)       (x >= BREAKABLE_BLOCK)
+#define IS_ENEMY(x)             (x <= ENEMY_1)
+#define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
+#define MAP_ID(x)               (x[0][0])
 
 
 /*************************************************
@@ -109,6 +143,8 @@ block_t *get_block_record(int16_t row, int8_t column);
  */
 uint8_t check_block_collisions(const int8_t map[][NUM_BLOCKS_Y], physics_t *physics, uint16_t map_x);
 
+void fix_position(physics_t *physics, uint16_t map_x);
+
 void bump_block(block_t *block, sprite_t *sprite, uint64_t timer);
 
 void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column, uint16_t map_row);
@@ -122,8 +158,6 @@ void spawn_enemies(const int8_t map[][NUM_BLOCKS_Y], int16_t start_row, int16_t 
 item_t generate_item(int16_t row, int8_t column, uint16_t map_x);
 
 uint8_t store_item(item_t item);
-
-void animate_coin(item_t *item, uint8_t *score, uint64_t timer);
 
 
 #endif // __GAME_ENGINE_H__

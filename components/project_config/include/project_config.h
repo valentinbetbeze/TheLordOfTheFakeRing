@@ -114,44 +114,23 @@
  * Game design parameters
  ************************************************/
 
-// All blocks > 0 are solid, else they are not.
 #define NUM_BLOCK_RECORDS       10
 #define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
 #define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
-#define CUSTOM_SPRITE_3         (-3)
-#define CUSTOM_SPRITE_2         (-2)
-#define CUSTOM_SPRITE_1         (-1)
-#define BACKGROUND_BLOCK        (0)
-#define NON_BREAKABLE_BLOCK_1   (1)
-#define NON_BREAKABLE_BLOCK_2   (2)
-#define BREAKABLE_BLOCK         (3)
-#define BONUS_BLOCK             (4)
 
 #define NUM_ENEMY_RECORDS       15
 #define TIMESTEP_ENEMY          15          // in milliseconds
 #define KILL_ZONE_Y             5           // Height, in pixels, in which an enemy is killed
-#define ENEMY_1                 (-30)
-#define ENEMY_2                 (-31)
-#define ENEMY_3                 (-32)
 
 #define NUM_ITEMS               NUM_BLOCK_RECORDS
 #define TIMESTEP_BUMP_COIN      5           // in milliseconds
 #define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
 #define SHIELD_ALPHA            0.5         // Shield color transparency
-#define COIN                    (1)
-#define LIGHTSTAFF              (2)
-#define SHIELD                  (3)
 
 #define SPEED_INITIAL           1
 #define SPEED_JUMP_INIT         2
 #define SLIP_OFFSET             2           // Left/right slip offset, in pixels
 #define TIMESTEP_ACCEL          200         // in milliseconds
-
-#define IS_SOLID(x)             (x > BACKGROUND_BLOCK)
-#define IS_INTERACTIVE(x)       (x >= BREAKABLE_BLOCK)
-#define IS_ENEMY(x)             (x <= ENEMY_1)
-#define MAP_BACKGROUND(x)       (x[0][2] << 8 | x[0][1])
-#define MAP_ID(x)               (x[0][0])
 
 
 #endif // __PROJECT_CONFIG_H__

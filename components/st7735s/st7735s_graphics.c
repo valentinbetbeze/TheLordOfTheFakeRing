@@ -85,7 +85,7 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
     uint16_t row, column;
     get_frame_indexes(x, y, &row, &column);
 
-    // Do not write if out of the fram's range
+    // Do not write if out of the frame's range
     if ((NUM_TRANSACTIONS <= row) || (PX_PER_TRANSACTION <= column)) {
         return;
     }
@@ -94,7 +94,7 @@ static void write_to_frame(int16_t x, int16_t y, uint16_t color, float alpha)
         frame[row][column] = color;
         return;
     }
-    
+    // Apply transparency
     uint16_t color1 = (uint16_t)SPI_SWAP_DATA_TX(frame[row][column], 16);
     uint8_t red1 = (color1 >> 11);
     uint8_t green1 = (color1 >> 5 & 0b111111);

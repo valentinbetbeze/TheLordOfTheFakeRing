@@ -111,7 +111,6 @@ void app_main()
     gamepad_init_button(&button_C, PIN_BTN_C);
 #pragma endregion
 
-
     /*************************************************
      * Game initialization
      *************************************************/
@@ -121,7 +120,7 @@ void app_main()
     game.map_x = (game.map_row - 1) * BLOCK_SIZE;
 
     // Setup game text objects
-    const char coins_text[] = "COINS: ";
+    const char coins_text[] = "COIN: ";
     const text_t coins_text_object = {
         .pos_x = 5,
         .pos_y = 5,
@@ -289,16 +288,17 @@ void app_main()
             player.physics.pos_y -= player.physics.speed_y;
         }
         else {
-            if (player.physics.falling && player.physics.accelerating) {
+            if (player.physics.falling && player.physics.accelerating &&
+                player.physics.speed_y < BLOCK_SIZE / 2) {
                 player.timer = (uint32_t)game.timer;
                 player.physics.accelerating = 0;
-                player.physics.speed_y++; // accelerating here
+                player.physics.speed_y++;
             }
             player.physics.pos_y += player.physics.speed_y;
         }
         // Check for collisions with blocks & update position if necessary
         if (check_block_collisions(map, &player.physics, game.map_x)) {
-            return;
+            fix_position(&player.physics, game.map_x);
         }
         // Check for lightstaff usage
         if (player.lightstaff && gamepad_poll_button(&button_A)) {
@@ -358,7 +358,7 @@ void app_main()
             enemies[i].physics.pos_y += enemies[i].physics.speed_y;
             // Check for block collisions and update position if necessary
             if (check_block_collisions(map, &enemies[i].physics, game.map_x)) {
-                return;
+                fix_position(&enemies[i].physics, game.map_x);
             }
             // Check for collision with player
             if (player.physics.pos_x < enemies[i].physics.pos_x + BLOCK_SIZE &&
