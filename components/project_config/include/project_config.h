@@ -118,6 +118,10 @@
 #define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
 #define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
 
+#define MAX_PLATFORMS           10           // Maximum number of platforms allowed on a frame
+#define SPEED_PLATFORM          1
+#define TIMESTEP_PLATFORM       15          // in milliseconds
+
 #define NUM_ENEMY_RECORDS       15
 #define TIMESTEP_ENEMY          15          // in milliseconds
 #define KILL_ZONE_Y             5           // Height, in pixels, in which an enemy is killed
@@ -125,10 +129,10 @@
 #define NUM_ITEMS               NUM_BLOCK_RECORDS
 #define TIMESTEP_BUMP_COIN      5           // in milliseconds
 #define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
-#define SHIELD_ALPHA            0.5         // Shield color transparency
+#define SHIELD_ALPHA            0.7         // Shield color transparency
 
-#define SPEED_INITIAL           1
-#define SPEED_JUMP_INIT         2
+#define SPEED_INITIAL           1           // Player base speed
+#define SPEED_JUMP_INIT         2           // Jump 'impulsion' speed (v0)
 #define SLIP_OFFSET             2           // Left/right slip offset, in pixels
 #define TIMESTEP_ACCEL          200         // in milliseconds
 

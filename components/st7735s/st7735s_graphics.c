@@ -201,25 +201,38 @@ void st7735s_draw_circle(circle_t circle)
 {
     // https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
     uint8_t y_out, y_in;
-    uint8_t x_end = circle.radius * 0.707 + 1;
 
-    // Draw all 8 octants simultaneously
+    // No thickness means fully filled circle
+    if (circle.thickness == 0) {
+        for (uint8_t x = 0; x < circle.radius; x++) {
+            write_to_frame(circle.pos_x + x, circle.pos_y, circle.color, circle.alpha);
+            write_to_frame(circle.pos_x - x, circle.pos_y, circle.color, circle.alpha);
+            y_out = round(sqrt(pow(circle.radius, 2) - pow(x, 2)));
+            for (uint8_t y = 1; y < y_out; y++) {
+                if (x == 0) {
+                    write_to_frame(circle.pos_x, circle.pos_y + y, circle.color, circle.alpha);
+                    write_to_frame(circle.pos_x, circle.pos_y - y, circle.color, circle.alpha);
+                }
+                else {
+                    write_to_frame(circle.pos_x + x, circle.pos_y + y, circle.color, circle.alpha);
+                    write_to_frame(circle.pos_x + x, circle.pos_y - y, circle.color, circle.alpha);
+                    write_to_frame(circle.pos_x - x, circle.pos_y + y, circle.color, circle.alpha);
+                    write_to_frame(circle.pos_x - x, circle.pos_y - y, circle.color, circle.alpha);
+                }
+            }
+        }
+        return;
+    }
+    // Else, draw all 8 octants simultaneously
+    uint8_t x_end = circle.radius * 0.707 + 1;
     for (uint8_t x = 0; x < x_end; x++) {
         // Outer circle
         y_out = round(sqrt(pow(circle.radius, 2) - pow(x, 2)));
         rasterize_circle(circle, x, y_out);
-        // No thickness means fully filled circle
-        if (circle.thickness == 0) {
-            for (uint8_t y = 0; y < y_out; y++) {
-                rasterize_circle(circle, x, y);
-            }
-        }
-        else if (1 < circle.thickness){
-            y_in = round(sqrt(pow(circle.radius - circle.thickness, 2) - pow(x, 2)));
-            rasterize_circle(circle, x, y_in);
-            for (uint8_t y = y_in + 1; y < y_out; y++) {
-                rasterize_circle(circle, x, y);
-            }
+        y_in = round(sqrt(pow(circle.radius - circle.thickness, 2) - pow(x, 2)));
+        rasterize_circle(circle, x, y_in);
+        for (uint8_t y = y_in + 1; y < y_out; y++) {
+            rasterize_circle(circle, x, y);
         }
     }
 }

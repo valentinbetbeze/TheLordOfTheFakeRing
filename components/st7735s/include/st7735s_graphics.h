@@ -31,6 +31,8 @@
 #define RED                 (SPI_SWAP_DATA_TX(0xF800, 16))
 #define GREEN               (SPI_SWAP_DATA_TX(0x07E0, 16))
 #define BLUE                (SPI_SWAP_DATA_TX(0x001F, 16))
+#define YELLOW              (SPI_SWAP_DATA_TX(0xF7E0, 16))
+#define YELLOW_1            (SPI_SWAP_DATA_TX(0xF7F1, 16))
 #define WHITE               (0xFFFF)
 #define BLACK               (0x0000)
 

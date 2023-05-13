@@ -31,18 +31,12 @@ struct {
     uint8_t playing :       1;
     uint8_t cam_moving :    1;
     uint8_t coins;
-    uint8_t map_id;
-    uint16_t map_x;
-    uint16_t map_row;
+    uint16_t map_x;             // First pixel x-coordinate of the current map frame
+    uint16_t map_row;           // First row of the current map frame
     uint64_t timer;
 } game = {
-    .reset      = 0,
     .playing    = 1,
-    .cam_moving = 0,
-    .map_id     = 0,
-    .map_x      = 0,     // First pixel x-coordinate of the current map frame
-    .map_row    = 1,    // First row of the current map frame
-    .timer      = 0,
+    .map_row    = 41,
 };
 
 
@@ -115,11 +109,10 @@ void app_main()
      * Game initialization
      *************************************************/
 #pragma region
-    const int8_t (*map)[NUM_BLOCKS_Y] = moria;
-    game.map_id = MAP_ID(map);
-    game.map_x = (game.map_row - 1) * BLOCK_SIZE;
+    game.map_x = game.map_row * BLOCK_SIZE; // Initialization
+    map_t map = map_moria;
 
-    // Setup game text objects
+    // Setup UI
     const char coins_text[] = "COIN: ";
     const text_t coins_text_object = {
         .pos_x = 5,
@@ -157,12 +150,19 @@ void app_main()
         .adaptive = 1
     };
 
+    // Initialize and load game elements
+    initialize_blocks_records();
+    spawn_enemies(map, game.map_x, game.map_row, game.map_row + NUM_BLOCKS_X + 1);
+    if (load_platforms(map)) {
+        return;
+    }
+    // Create the player's character
     character_t player = {
         .life               = 3,
         .lightstaff         = 0,
         .shield             = 0,
         .forward            = 1,
-        .physics.pos_x      = 0,
+        .physics.pos_x      = game.map_x + 0,
         .physics.pos_y      = BLOCK_SIZE,
         .physics.speed_x    = SPEED_INITIAL,
         .physics.speed_y    = SPEED_INITIAL,
@@ -170,10 +170,6 @@ void app_main()
         .sprite.width       = BLOCK_SIZE,
         .sprite.data        = sprite_player
     };
-
-    initialize_blocks_records();
-    // Create the enemies appearing in the very first frame of the map
-    spawn_enemies(map, game.map_row, game.map_row + NUM_BLOCKS_X + 1, game.map_row);
 #pragma endregion
 
     while(game.playing) {
@@ -181,10 +177,10 @@ void app_main()
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
 
-
         /*************************************************
          * Game state check
          *************************************************/
+#pragma region
         if (player.life == 0) {
             game.playing = 0;
             break;
@@ -193,7 +189,7 @@ void app_main()
             game.reset = 0;
             game.cam_moving = 0;
             game.map_x = 0;
-            game.map_row = 1;
+            game.map_row = 0;
             // Reset character state (except life!)
             player.shield                       = 0;
             player.lightstaff                   = 0;
@@ -201,8 +197,9 @@ void app_main()
             player.power_used                   = 0;
             player.spell_radius                 = 0;
             player.timer                        = 0;
-            player.physics.pos_x                = BLOCK_SIZE;
-            player.physics.pos_y                = LCD_HEIGHT - 2 * BLOCK_SIZE;
+            player.coins                        = 0;
+            player.physics.pos_x                = 0;
+            player.physics.pos_y                = BLOCK_SIZE;
             player.physics.speed_x              = SPEED_INITIAL;
             player.physics.speed_y              = SPEED_INITIAL;
             player.physics.falling              = 0;
@@ -218,7 +215,7 @@ void app_main()
                 memset(&enemies[i], 0, sizeof(enemies[i]));
             }
             // Reset first enemies
-            spawn_enemies(map, 1, NUM_BLOCKS_X + 1, game.map_row);
+            spawn_enemies(map, game.map_x, game.map_row, game.map_row + NUM_BLOCKS_X);
             // Reset items
             for (uint8_t i = 0; i < NUM_ITEMS; i++) {
                 memset(&items[i], 0, sizeof(items[i]));
@@ -229,9 +226,45 @@ void app_main()
         for (uint8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
             blocks[i].is_hit = 0;
         }
+#pragma endregion
+
 
         /*************************************************
-         * Main character state & position update
+         * Platforms
+         *************************************************/
+        // Update the position of all platforms
+        for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
+            // Abort if no more platforms to update
+            platforms[i].moved = 0;
+            if (platforms[i].start_row == -1) {
+                break;
+            }
+            // update y
+            else if (platforms[i].vertical && (game.timer - platforms[i].timer) / TIMESTEP_PLATFORM > 1) {
+                uint8_t start_y = LCD_HEIGHT - (platforms[i].start_column + 1) * BLOCK_SIZE;
+                uint8_t end_y = LCD_HEIGHT - (platforms[i].end_column + 1) * BLOCK_SIZE;
+                if (start_y < platforms[i].physics.pos_y || platforms[i].physics.pos_y <= end_y) {
+                    platforms[i].physics.speed_y *= -1;
+                }
+                platforms[i].physics.pos_y += platforms[i].physics.speed_y;
+                platforms[i].timer = (uint32_t)game.timer;
+                platforms[i].moved = 1;
+            }
+            // update x
+            else if (platforms[i].horizontal && (game.timer - platforms[i].timer) / TIMESTEP_PLATFORM > 1) {
+                if ((platforms[i].physics.pos_x < platforms[i].start_row * BLOCK_SIZE) ||
+                    (platforms[i].end_row * BLOCK_SIZE <= platforms[i].physics.pos_x)) {
+                    platforms[i].physics.speed_x *= -1;
+                }
+                platforms[i].physics.pos_x += platforms[i].physics.speed_x;
+                platforms[i].timer = (uint32_t)game.timer;
+                platforms[i].moved = 1;
+            }
+        }
+
+
+        /*************************************************
+         * Player state & position update
          *************************************************/
 #pragma region
         // Check the state (falling/jumping)
@@ -258,21 +291,18 @@ void app_main()
         int8_t x = gamepad_read_joystick_axis(adc_handle, joystick.axis_x);
         if (0 < x / 100) {
             player.forward = 1;
-            player.sprite.flip_x = 0;
         }
         else if (x / 100 < 0){
             player.forward = 0;
-            player.sprite.flip_x = 1;
         }
         player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
-        if (player.physics.pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+        if (player.physics.pos_x - game.map_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
             game.cam_moving = 1;
             game.map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixel
-            game.map_row = (uint16_t)(game.map_x / BLOCK_SIZE) + 1;
-            player.physics.pos_x = LCD_WIDTH / 2 - BLOCK_SIZE / 2;
+            game.map_row = (uint16_t)(game.map_x / BLOCK_SIZE);
         }
-        else if (player.physics.pos_x < 0) {
-            player.physics.pos_x = 0;
+        else if (player.physics.pos_x < game.map_x) {
+            player.physics.pos_x = game.map_x;
         }
         else {
             game.cam_moving = 0;
@@ -283,7 +313,7 @@ void app_main()
             if (player.physics.accelerating) {
                 player.timer = (uint32_t)game.timer;
                 player.physics.accelerating = 0;
-                player.physics.speed_y--; // decelerating here
+                player.physics.speed_y--; // Decelerating (due to gravity)
             }
             player.physics.pos_y -= player.physics.speed_y;
         }
@@ -294,11 +324,31 @@ void app_main()
                 player.physics.accelerating = 0;
                 player.physics.speed_y++;
             }
-            player.physics.pos_y += player.physics.speed_y;
+            player.physics.pos_y += player.physics.speed_y; // Gravity
         }
-        // Check for collisions with blocks & update position if necessary
-        if (check_block_collisions(map, &player.physics, game.map_x)) {
-            fix_position(&player.physics, game.map_x);
+        // Check for block collisions & update position if necessary
+        int8_t collision =  check_block_collisions(map, &player.physics, game.map_row);
+        if (collision == 1) {
+            fix_block_collision(&player.physics);
+        }
+        else if (collision == -1) {
+            return;
+        }
+        // Check if standing on a platform
+        int8_t platform_index = is_standing_on_platform(&player.physics);
+        if (platform_index == -2) {
+            return;
+        }
+        else if (0 <= platform_index) {
+            // Collision with platform = "reactive force"
+            player.physics.pos_y -= player.physics.speed_y;
+            // If moving, follow the movement of the platform
+            if (platforms[platform_index].moved && platforms[platform_index].horizontal) {
+                player.physics.pos_x += platforms[platform_index].physics.speed_x;
+            }
+            else if (platforms[platform_index].moved && platforms[platform_index].vertical) {
+                player.physics.pos_y += platforms[platform_index].physics.speed_y;
+            }
         }
         // Check for lightstaff usage
         if (player.lightstaff && gamepad_poll_button(&button_A)) {
@@ -316,13 +366,13 @@ void app_main()
          * Enemies states & positions update
          *************************************************/
         // Check the next 4 rows for enemies to spawn
-        spawn_enemies(map, game.map_row + NUM_BLOCKS_X, game.map_row + NUM_BLOCKS_X + 3,game.map_row);
+        spawn_enemies(map, game.map_x, game.map_row + NUM_BLOCKS_X + 1, game.map_row + NUM_BLOCKS_X + 4);
         // Apply dynamics to each living enemy
         for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
             if (enemies[i].life == 0) {
                 continue;
             }
-            else if (enemies[i].physics.pos_x < -LCD_WIDTH || enemies[i].physics.pos_y > LCD_HEIGHT) {
+            else if (enemies[i].physics.pos_x < game.map_x - LCD_WIDTH || enemies[i].physics.pos_y > LCD_HEIGHT) {
                 enemies[i].life = 0;
                 continue;
             }
@@ -337,16 +387,21 @@ void app_main()
             // Update x-direction
             if (!enemies[i].physics.falling && 
                (enemies[i].physics.left_collision || enemies[i].physics.right_collision)) {
-                enemies[i].physics.speed_x = -1 * enemies[i].physics.speed_x;
+                enemies[i].physics.speed_x *= -1;
             }
             // Update x-position
             if (game.cam_moving && enemies[i].physics.speed_x < 0) {
-                enemies[i].physics.pos_x += 2 * enemies[i].physics.speed_x;
-                enemies[i].timer_x = (uint32_t)game.timer;
-            }
-            else if ((game.timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) {
                 enemies[i].physics.pos_x += enemies[i].physics.speed_x;
                 enemies[i].timer_x = (uint32_t)game.timer;
+            }
+            if ((game.timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) {
+                enemies[i].timer_x = (uint32_t)game.timer;
+                if (game.cam_moving && enemies[i].physics.speed_x < 0) {
+                    enemies[i].physics.pos_x += 2 * enemies[i].physics.speed_x;
+                }
+                else {
+                    enemies[i].physics.pos_x += enemies[i].physics.speed_x;
+                }
             }
             // Update y-position
             enemies[i].physics.accelerating = (game.timer - enemies[i].timer_y) / TIMESTEP_ACCEL;
@@ -357,8 +412,28 @@ void app_main()
             }
             enemies[i].physics.pos_y += enemies[i].physics.speed_y;
             // Check for block collisions and update position if necessary
-            if (check_block_collisions(map, &enemies[i].physics, game.map_x)) {
-                fix_position(&enemies[i].physics, game.map_x);
+            int8_t collision =  check_block_collisions(map, &enemies[i].physics, game.map_row);
+            if (collision == 1) {
+                fix_block_collision(&enemies[i].physics);
+            }
+            else if (collision == -1) {
+                return;
+            }
+            // Check if standing on a platform
+            int8_t platform_index = is_standing_on_platform(&enemies[i].physics);
+            if (platform_index == -2) {
+                return;
+            }
+            else if (0 <= platform_index) {
+                // Collision with platform = "reactive force"
+                enemies[i].physics.pos_y -= enemies[i].physics.speed_y;
+                // If moving, follow the movement of the platform
+                if (platforms[platform_index].moved && platforms[platform_index].horizontal) {
+                    enemies[i].physics.pos_x += platforms[platform_index].physics.speed_x;
+                }
+                else if (platforms[platform_index].moved && platforms[platform_index].vertical) {
+                    enemies[i].physics.pos_y += platforms[platform_index].physics.speed_y;
+                }
             }
             // Check for collision with player
             if (player.physics.pos_x < enemies[i].physics.pos_x + BLOCK_SIZE &&
@@ -404,20 +479,20 @@ void app_main()
             if (!items[i].spawned || items[i].taken) {
                 continue;
             }
-            else if (player.physics.pos_x < items[i].sprite.pos_x + items[i].sprite.width &&
-                     player.physics.pos_x >= items[i].sprite.pos_x - items[i].sprite.width &&
+            else if (player.physics.pos_x - game.map_x < items[i].sprite.pos_x + items[i].sprite.width &&
+                     player.physics.pos_x - game.map_x >= items[i].sprite.pos_x - items[i].sprite.width &&
                      player.physics.pos_y < items[i].sprite.pos_y + items[i].sprite.height &&
                      player.physics.pos_y >= items[i].sprite.pos_y - items[i].sprite.height) {
                 if (items[i].type == LIGHTSTAFF) {
                     if (player.lightstaff) {
-                        game.coins += 20;
+                        player.coins += 20;
                     }
                     player.lightstaff = 1;
                     items[i].taken = 1;
                 }
                 else if (items[i].type == SHIELD) {
                     if (player.shield) {
-                        game.coins += 20;
+                        player.coins += 20;
                     }
                     player.shield = 1;
                     items[i].taken = 1;
@@ -439,7 +514,7 @@ void app_main()
                 continue;
             }
             // If the block has been hit, update its status based on its type
-            int8_t block_type = map[blocks[i].row][blocks[i].column];
+            int8_t block_type = map.data[blocks[i].row][blocks[i].column];
             if (blocks[i].is_hit) {
                 switch (block_type) {
                     case BREAKABLE_BLOCK:
@@ -469,9 +544,9 @@ void app_main()
          Sequentially, draw the background, blocks, enemies, items and then player.
          Graphic assets drawn first will appear below other graphic assets.
         */ 
-        st7735s_fill_background(MAP_BACKGROUND(map));
+        st7735s_fill_background(map.background_color);
         // Draw items
-        for (int i = 0; i < NUM_ITEMS; i++) {
+        for (uint8_t i = 0; i < NUM_ITEMS; i++) {
             if (!items[i].spawned) {
                 continue;
             }
@@ -495,7 +570,7 @@ void app_main()
                     else {
                         items[i].steps = 0;
                         items[i].taken = 1;
-                        game.coins++;
+                        player.coins++;
                     }
                     // Change the coin sprite 
                     uint8_t next_sprite = (items[i].steps % 3 == 1);
@@ -541,7 +616,7 @@ void app_main()
         // Draw blocks
         for (uint8_t row = game.map_row; row <= game.map_row + NUM_BLOCKS_X; row++) {
             for (int column = 0; column < NUM_BLOCKS_Y; column++) {
-                int8_t block_type = map[row][NUM_BLOCKS_Y - 1 - column];
+                int8_t block_type = map.data[row][NUM_BLOCKS_Y - 1 - column];
                 if (block_type == BACKGROUND_BLOCK) {
                     continue;
                 }
@@ -553,54 +628,102 @@ void app_main()
                 sprite_t sprite = {
                     .height = BLOCK_SIZE,
                     .width = BLOCK_SIZE,
-                    .pos_x = (row - 1) * BLOCK_SIZE - game.map_x,
+                    .pos_x = row * BLOCK_SIZE - game.map_x,
                     .pos_y = column * BLOCK_SIZE
                 };
                 switch (block_type) {
                     case CUSTOM_SPRITE_3:
-                        switch (game.map_id) {
-                            case 1: 
+                        switch (map.id) {
+                            case SHIRE: 
                                 rectangle_t rectangle = {
-                                    .height = BLOCK_SIZE,
-                                    .width = BLOCK_SIZE,
-                                    .pos_x = (row - 1) * BLOCK_SIZE - game.map_x,
-                                    .pos_y = column * BLOCK_SIZE,
+                                    .height = BLOCK_SIZE + 4,
+                                    .width = BLOCK_SIZE + 4,
+                                    .pos_x = row * BLOCK_SIZE - game.map_x - 2,
+                                    .pos_y = column * BLOCK_SIZE - 2,
                                     .color = BLACK
                                 };
                                 st7735s_draw_rectangle(rectangle);
                                 break;
-                            default: break;
+                            case MORIA:
+                                circle_t circle = {
+                                    .pos_y = column * BLOCK_SIZE + 6,
+                                    .color = YELLOW_1,
+                                    .alpha = 0.8,
+                                    .radius = 10,
+                                };
+                                // Simple light animation
+                                if (game.timer % 4 < 2) {
+                                    circle.pos_x = row * BLOCK_SIZE - game.map_x + 7;
+                                }
+                                else {
+                                    circle.pos_x = row * BLOCK_SIZE - game.map_x + 9;
+                                }
+                                st7735s_draw_circle(circle);
+                                sprite.flip_x = 1;
+                                sprite.data = torch;
+                                break;
+                            default:
+                                break;
                         }
                         break;
                     case CUSTOM_SPRITE_2:
-                        switch (game.map_id) {
-                            case 1: sprite.data = moria_block_1; break;
-                            default: break;
+                        switch (map.id) {
+                            case SHIRE:
+                                rectangle_t rectangle = {
+                                    .height = BLOCK_SIZE,
+                                    .width = BLOCK_SIZE - 2,
+                                    .pos_x = row * BLOCK_SIZE - game.map_x + 1,
+                                    .pos_y = column * BLOCK_SIZE + 3,
+                                    .color = BLACK
+                                };
+                                st7735s_draw_rectangle(rectangle);
+                                sprite.data = moria_block_1;
+                                break;
+                            case MORIA:
+                                circle_t circle = {
+                                    .pos_y = column * BLOCK_SIZE + 6,
+                                    .color = YELLOW_1,
+                                    .alpha = 0.8,
+                                    .radius = 10,
+                                };
+                                // Simple light animation
+                                if (game.timer % 4 < 2) {
+                                    circle.pos_x = row * BLOCK_SIZE - game.map_x + 7;
+                                }
+                                else {
+                                    circle.pos_x = row * BLOCK_SIZE - game.map_x + 5;
+                                }
+                                st7735s_draw_circle(circle);
+                                sprite.data = torch;
+                                break;
+                            default:
+                                break;
                         }
                         break;
                     case CUSTOM_SPRITE_1:
-                        switch (game.map_id) {
-                            case 1: sprite.data = shire_block_water; break;
+                        switch (map.id) {
+                            case SHIRE: sprite.data = shire_block_water; break;
+                            case MORIA: sprite.data = shire_block_water; break;
                             default: break;
                         }
                         break;
                     case NON_BREAKABLE_BLOCK_1:
-                        switch (game.map_id) {
-                            case 1: sprite.data = shire_block_1; break;
-                            case 2: sprite.data = moria_block_1; break;
+                        switch (map.id) {
+                            case SHIRE: sprite.data = shire_block_1; break;
+                            case MORIA: sprite.data = moria_block_1; break;
                             default: break;
                         }
                         break;
                     case NON_BREAKABLE_BLOCK_2:
-                        switch (game.map_id) {
-                            case 1: sprite.data = shire_block_1_1; break;
+                        switch (map.id) {
+                            case SHIRE: sprite.data = shire_block_1_1; break;
                             default: break;
                         }
                         break;
                     case BREAKABLE_BLOCK:
-                        switch (game.map_id) {
-                            case 1: sprite.data = shire_block_2; break;
-                            case 2: sprite.data = moria_block_2; break;
+                        switch (map.id) {
+                            case SHIRE: sprite.data = shire_block_2; break;
+                            case MORIA: sprite.data = moria_block_2; break;
                             default: break;
                         }
                         break;
@@ -608,8 +731,8 @@ void app_main()
                         if (block != NULL && block->bumping) {
                             bump_block(block, &sprite, game.timer);
                         }
-                        switch (game.map_id) {
-                            case 1: 
+                        switch (map.id) {
+                            case SHIRE: 
                                 if (block != NULL && block->item_given) {
                                     sprite.data = shire_block_3_1;
                                 }
@@ -617,7 +740,14 @@ void app_main()
                                     sprite.data = shire_block_3;
                                 }
                                 break;
-                            case 2: sprite.data = moria_block_3; break;
+                            case MORIA:
+                                if (block != NULL && block->item_given) {
+                                    sprite.data = moria_block_3_1;
+                                }
+                                else {
+                                    sprite.data = moria_block_3;
+                                }
+                                break;
                             default: break;
                         }
                         break;
@@ -629,8 +759,40 @@ void app_main()
                 }
             }
         }
+        // Draw platforms
+        for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
+            if (platforms[i].start_row == -1) {
+                break;
+            }
+            else if (platforms[i].physics.pos_x + 2 * BLOCK_SIZE < game.map_x ||
+                     game.map_x + BLOCK_SIZE * NUM_BLOCKS_X <= platforms[i].physics.pos_x) {
+                continue; // if not in the frame
+            }
+            sprite_t platform_left = {
+                .height = BLOCK_SIZE,
+                .width = BLOCK_SIZE,
+                .pos_x = platforms[i].physics.pos_x - game.map_x,
+                .pos_y = platforms[i].physics.pos_y
+            };
+            sprite_t platform_right = {
+                .height = BLOCK_SIZE,
+                .width = BLOCK_SIZE,
+                .pos_x = platform_left.pos_x + BLOCK_SIZE,
+                .pos_y = platform_left.pos_y
+            };
+            switch (map.id) {
+                case MORIA:
+                    platform_left.data = moria_platform_block_1;
+                    platform_right.data = moria_platform_block_2;
+                break;
+            }
+            if (platform_left.data != NULL && platform_right.data != NULL) {
+                st7735s_draw_sprite(platform_left);
+                st7735s_draw_sprite(platform_right);
+            }
+        }
         // Draw enemies
-        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
+        for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
             if (enemies[i].life <= 0) {
                 memset(&enemies[i], 0, sizeof(enemies[i]));
                 continue;
@@ -638,17 +800,24 @@ void app_main()
             sprite_t sprite = {
                 .height = BLOCK_SIZE,
                 .width = BLOCK_SIZE,
-                .pos_x = enemies[i].physics.pos_x,
+                .pos_x = enemies[i].physics.pos_x - game.map_x,
                 .pos_y = enemies[i].physics.pos_y
             };
             if (enemies[i].physics.speed_x > 0) {
                 sprite.flip_x = 1;
             }
-            switch(map[enemies[i].row][enemies[i].column]) {
+            switch(map.data[enemies[i].row][enemies[i].column]) {
                 case ENEMY_1:
-                    switch (game.map_id) {
-                        case 1: sprite.data = shire_enemy_1; break;
-                        case 2: sprite.data = moria_enemy_1; break;
+                    switch (map.id) {
+                        case SHIRE: sprite.data = shire_enemy_1; break;
+                        case MORIA: sprite.data = moria_enemy_1; break;
+                        default: break;
+                    }
+                    break;
+                case ENEMY_2:
+                    switch (map.id) {
+                        case SHIRE: sprite.data = shire_enemy_1; break;
+                        case MORIA: sprite.data = moria_enemy_1; break;
                         default: break;
                     }
                     break;
@@ -662,15 +831,18 @@ void app_main()
         // Draw text
         st7735s_draw_text(coins_text_object);
         st7735s_draw_text(life_text_object);
-        sprintf(num_coins_text, "%i", (uint8_t)game.coins);
+        sprintf(num_coins_text, "%i", (uint8_t)game.coins + player.coins);
         sprintf(num_life_text, "%i", (uint8_t)player.life);
         st7735s_draw_text(coins_object);        
         st7735s_draw_text(life_object);
         // Finally, draw the player & its stuff
+#pragma region
+        player.sprite.pos_x = player.physics.pos_x - game.map_x;
+        player.sprite.pos_y = player.physics.pos_y;
         if (player.shield) {
             rectangle_t shield_fill = {
-                .pos_x = player.physics.pos_x,
-                .pos_y = player.physics.pos_y,
+                .pos_x = player.sprite.pos_x,
+                .pos_y = player.sprite.pos_y,
                 .width = BLOCK_SIZE,
                 .height = BLOCK_SIZE,
                 .color = WHITE,
@@ -680,8 +852,8 @@ void app_main()
             sprite_t shield_edge = {
                 .height = BLOCK_SIZE,
                 .width = BLOCK_SIZE,
-                .pos_x = player.physics.pos_x - BLOCK_SIZE,
-                .pos_y = player.physics.pos_y,
+                .pos_x = player.sprite.pos_x - BLOCK_SIZE,
+                .pos_y = player.sprite.pos_y,
                 .data = sprite_shield_edge,
                 .alpha = SHIELD_ALPHA,
             };
@@ -700,15 +872,19 @@ void app_main()
             shield_edge.pos_y -= BLOCK_SIZE;
             st7735s_draw_sprite(shield_edge);
         }
-        player.sprite.pos_x = player.physics.pos_x;
-        player.sprite.pos_y = player.physics.pos_y;
+        if (player.forward) {
+            player.sprite.flip_x = 0;
+        }
+        else {
+            player.sprite.flip_x = 1;
+        }
         st7735s_draw_sprite(player.sprite);
         if (player.lightstaff) {
             sprite_t lightstaff = {
                 .width = BLOCK_SIZE,
                 .height = BLOCK_SIZE,
-                .pos_x = player.physics.pos_x,
-                .pos_y = player.physics.pos_y,
+                .pos_x = player.sprite.pos_x,
+                .pos_y = player.sprite.pos_y,
                 .data = sprite_lightstaff_equipped
             };
             if (!player.forward) {
@@ -720,8 +896,8 @@ void app_main()
         if (player.power_used && player.spell_radius < (uint16_t)LCD_SIZE) {
             player.spell_radius += 5;
             circle_t circle = {
-                .pos_x = player.physics.pos_x + BLOCK_SIZE / 2,
-                .pos_y = player.physics.pos_y + BLOCK_SIZE / 2,
+                .pos_x = player.sprite.pos_x + BLOCK_SIZE / 2,
+                .pos_y = player.sprite.pos_y + BLOCK_SIZE / 2,
                 .radius = player.spell_radius,
                 .thickness = 0,
                 .color = WHITE
@@ -745,7 +921,8 @@ void app_main()
             player.power_used = 0;
             player.spell_radius = 0;
         }
-        
+#pragma endregion
+
         st7735s_push_frame(tft_handle);
 
         /*************************************************
