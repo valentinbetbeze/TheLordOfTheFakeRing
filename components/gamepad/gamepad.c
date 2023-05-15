@@ -34,7 +34,7 @@ uint8_t gamepad_poll_button(button_t *btn)
 }
 
 
-joystick_t gamepad_create_joystick(uint16_t idle_val_x, uint16_t idle_val_y)
+joystick_t gamepad_create_joystick(const uint16_t idle_val_x, const uint16_t idle_val_y)
 {
     joystick_t joystick;
     const uint8_t y_scale = 100;        /*!< So that JOY_MAX_N = 100% */

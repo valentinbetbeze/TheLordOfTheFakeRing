@@ -1,6 +1,6 @@
 #include "st7735s_hal.h"
 
-uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION];
+uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION] = {0};
 
 
 /**
@@ -22,7 +22,7 @@ static void send_command(spi_device_handle_t handle, uint8_t command)
 
 
 /**
- * @brief Send a byte to the ST7735S chip.
+ * @brief Send a byte to the ST7735S chip. // TODO: rename & description
  * 
  * @param handle SPI device handle of the display.
  * @param data Pointer to the data to be sent.
@@ -46,13 +46,15 @@ static void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len)
  * @param handle SPI device handle of the display.
  * @param data Pointer to the data to be sent.
  * @param len Amount of data in byte.
+ * 
+ * @details //TODO: explain why send_byte & send_word (why 2 functions and not 1)
  */
 static void send_word(spi_device_handle_t handle, uint16_t *data, size_t len)
 {
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.length = 8 * len;
-    transaction.tx_buffer = data;
+    transaction.tx_buffer = (uint16_t *)data;
     
     gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
     ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));

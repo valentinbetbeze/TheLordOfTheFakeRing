@@ -36,7 +36,7 @@ struct {
     uint64_t timer;
 } game = {
     .playing    = 1,
-    .map_row    = 41,
+    .map_row    = 126,
 };
 
 
@@ -152,18 +152,20 @@ void app_main()
 
     // Initialize and load game elements
     initialize_blocks_records();
-    spawn_enemies(map, game.map_x, game.map_row, game.map_row + NUM_BLOCKS_X + 1);
     if (load_platforms(map)) {
         return;
     }
+    spawn_enemies(map, game.map_x, game.map_row, game.map_row + NUM_BLOCKS_X + 1);
+
     // Create the player's character
     character_t player = {
         .life               = 3,
         .lightstaff         = 0,
         .shield             = 0,
         .forward            = 1,
+        .physics.platform_i = -1,
         .physics.pos_x      = game.map_x + 0,
-        .physics.pos_y      = BLOCK_SIZE,
+        .physics.pos_y      = 6 * BLOCK_SIZE,
         .physics.speed_x    = SPEED_INITIAL,
         .physics.speed_y    = SPEED_INITIAL,
         .sprite.height      = BLOCK_SIZE,
@@ -236,6 +238,7 @@ void app_main()
         for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
             // Abort if no more platforms to update
             platforms[i].moved = 0;
+            platforms[i].changed_dir = 0;
             if (platforms[i].start_row == -1) {
                 break;
             }
@@ -245,6 +248,7 @@ void app_main()
                 uint8_t end_y = LCD_HEIGHT - (platforms[i].end_column + 1) * BLOCK_SIZE;
                 if (start_y < platforms[i].physics.pos_y || platforms[i].physics.pos_y <= end_y) {
                     platforms[i].physics.speed_y *= -1;
+                    platforms[i].changed_dir = 1;
                 }
                 platforms[i].physics.pos_y += platforms[i].physics.speed_y;
                 platforms[i].timer = (uint32_t)game.timer;
@@ -255,6 +259,7 @@ void app_main()
                 if ((platforms[i].physics.pos_x < platforms[i].start_row * BLOCK_SIZE) ||
                     (platforms[i].end_row * BLOCK_SIZE <= platforms[i].physics.pos_x)) {
                     platforms[i].physics.speed_x *= -1;
+                    platforms[i].changed_dir = 1;
                 }
                 platforms[i].physics.pos_x += platforms[i].physics.speed_x;
                 platforms[i].timer = (uint32_t)game.timer;
@@ -267,7 +272,7 @@ void app_main()
          * Player state & position update
          *************************************************/
 #pragma region
-        // Check the state (falling/jumping)
+        // Check states (falling/jumping)
         if (player.physics.falling && player.physics.bottom_collision) {
             player.physics.falling = 0;
             player.physics.speed_y = SPEED_INITIAL;
@@ -275,9 +280,9 @@ void app_main()
         else if ((player.physics.bottom_collision || player.physics.left_collision ||
                  player.physics.right_collision) && gamepad_poll_button(&button_C)) {
             player.timer = (uint32_t)game.timer;
-            player.physics.jumping = 1;
-            player.physics.falling = 0;
-            player.physics.speed_y = SPEED_JUMP_INIT;
+            if (initiate_jump(&player.physics, SPEED_JUMP_INIT)) {
+                return;
+            }
         }
         else if ((player.physics.jumping && player.physics.top_collision) ||
                 (player.physics.jumping && player.physics.speed_y == 0)) {
@@ -298,7 +303,7 @@ void app_main()
         player.physics.pos_x += player.physics.speed_x * (int16_t)(x / 100);
         if (player.physics.pos_x - game.map_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
             game.cam_moving = 1;
-            game.map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixel
+            game.map_x += player.physics.speed_x; // Shift the map frame by 'speed_x' pixels
             game.map_row = (uint16_t)(game.map_x / BLOCK_SIZE);
         }
         else if (player.physics.pos_x < game.map_x) {
@@ -335,27 +340,27 @@ void app_main()
             return;
         }
         // Check if standing on a platform
-        int8_t platform_index = is_standing_on_platform(&player.physics);
-        if (platform_index == -2) {
-            return;
-        }
-        else if (0 <= platform_index) {
+        collision = check_platform_collision(&player.physics);
+        if (collision == 1) {
             // Collision with platform = "reactive force"
             player.physics.pos_y -= player.physics.speed_y;
             // If moving, follow the movement of the platform
-            if (platforms[platform_index].moved && platforms[platform_index].horizontal) {
-                player.physics.pos_x += platforms[platform_index].physics.speed_x;
+            if (platforms[player.physics.platform_i].moved && platforms[player.physics.platform_i].horizontal) {
+                player.physics.pos_x += platforms[player.physics.platform_i].physics.speed_x;
             }
-            else if (platforms[platform_index].moved && platforms[platform_index].vertical) {
-                player.physics.pos_y += platforms[platform_index].physics.speed_y;
+            else if (platforms[player.physics.platform_i].moved && platforms[player.physics.platform_i].vertical) {
+                player.physics.pos_y += platforms[player.physics.platform_i].physics.speed_y;
             }
+        }
+        else if (collision == -1) {
+            return;
         }
         // Check for lightstaff usage
         if (player.lightstaff && gamepad_poll_button(&button_A)) {
             player.power_used = 1;
         }
         // Check if the player fell
-        if (LCD_HEIGHT <= player.physics.pos_y) {
+        if (LCD_HEIGHT + BLOCK_SIZE <= player.physics.pos_y) {
             player.life--;
             game.reset = 1;
         }
@@ -366,13 +371,14 @@ void app_main()
          * Enemies states & positions update
          *************************************************/
         // Check the next 4 rows for enemies to spawn
-        spawn_enemies(map, game.map_x, game.map_row + NUM_BLOCKS_X + 1, game.map_row + NUM_BLOCKS_X + 4);
+        spawn_enemies(map, game.map_x, game.map_row + NUM_BLOCKS_X + 1, game.map_row + NUM_BLOCKS_X + 3);
         // Apply dynamics to each living enemy
         for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-            if (enemies[i].life == 0) {
-                continue;
-            }
-            else if (enemies[i].physics.pos_x < game.map_x - LCD_WIDTH || enemies[i].physics.pos_y > LCD_HEIGHT) {
+            // Kill & delete (non-grounded only) dead enemies from the record log
+            if (enemies[i].life == 0 || LCD_HEIGHT < enemies[i].physics.pos_y) {
+                if (!enemies[i].physics.grounded) {
+                    memset(&enemies[i], 0, sizeof(enemies[i]));
+                }
                 enemies[i].life = 0;
                 continue;
             }
@@ -385,23 +391,16 @@ void app_main()
                 enemies[i].physics.speed_y = SPEED_INITIAL;
             }
             // Update x-direction
-            if (!enemies[i].physics.falling && 
-               (enemies[i].physics.left_collision || enemies[i].physics.right_collision)) {
+            uint8_t turn_around =   (!enemies[i].physics.falling && 
+                                    (enemies[i].physics.left_collision || enemies[i].physics.right_collision));
+            if (turn_around) {
                 enemies[i].physics.speed_x *= -1;
             }
             // Update x-position
-            if (game.cam_moving && enemies[i].physics.speed_x < 0) {
+            if (!enemies[i].stationary && 
+                (((game.timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) || turn_around)) {
+                enemies[i].timer_x = (uint32_t)game.timer;
                 enemies[i].physics.pos_x += enemies[i].physics.speed_x;
-                enemies[i].timer_x = (uint32_t)game.timer;
-            }
-            if ((game.timer - enemies[i].timer_x) / TIMESTEP_ENEMY > 1) {
-                enemies[i].timer_x = (uint32_t)game.timer;
-                if (game.cam_moving && enemies[i].physics.speed_x < 0) {
-                    enemies[i].physics.pos_x += 2 * enemies[i].physics.speed_x;
-                }
-                else {
-                    enemies[i].physics.pos_x += enemies[i].physics.speed_x;
-                }
             }
             // Update y-position
             enemies[i].physics.accelerating = (game.timer - enemies[i].timer_y) / TIMESTEP_ACCEL;
@@ -412,7 +411,7 @@ void app_main()
             }
             enemies[i].physics.pos_y += enemies[i].physics.speed_y;
             // Check for block collisions and update position if necessary
-            int8_t collision =  check_block_collisions(map, &enemies[i].physics, game.map_row);
+            int8_t collision = check_block_collisions(map, &enemies[i].physics, game.map_row);
             if (collision == 1) {
                 fix_block_collision(&enemies[i].physics);
             }
@@ -420,26 +419,31 @@ void app_main()
                 return;
             }
             // Check if standing on a platform
-            int8_t platform_index = is_standing_on_platform(&enemies[i].physics);
-            if (platform_index == -2) {
-                return;
-            }
-            else if (0 <= platform_index) {
+            collision = check_platform_collision(&enemies[i].physics);
+            if (collision == 1) {
+                uint8_t index = enemies[i].physics.platform_i;
                 // Collision with platform = "reactive force"
                 enemies[i].physics.pos_y -= enemies[i].physics.speed_y;
-                // If moving, follow the movement of the platform
-                if (platforms[platform_index].moved && platforms[platform_index].horizontal) {
-                    enemies[i].physics.pos_x += platforms[platform_index].physics.speed_x;
+                // If the platform moved, follow its movement
+                if (platforms[index].horizontal && platforms[index].moved && !platforms[index].changed_dir) {
+                    enemies[i].physics.pos_x += platforms[index].physics.speed_x;
                 }
-                else if (platforms[platform_index].moved && platforms[platform_index].vertical) {
-                    enemies[i].physics.pos_y += platforms[platform_index].physics.speed_y;
+                else if (platforms[index].horizontal && platforms[index].moved && platforms[index].changed_dir) {
+                    enemies[i].physics.pos_x += 2 * platforms[index].physics.speed_x;
                 }
+                else if (platforms[index].vertical && platforms[index].moved) {
+                    enemies[i].physics.pos_y += platforms[index].physics.speed_y;
+                }
+            }
+            else if (collision == -1) {
+                return;
             }
             // Check for collision with player
             if (player.physics.pos_x < enemies[i].physics.pos_x + BLOCK_SIZE &&
                 player.physics.pos_x > enemies[i].physics.pos_x - BLOCK_SIZE &&
                 player.physics.pos_y < enemies[i].physics.pos_y + BLOCK_SIZE &&
                 player.physics.pos_y > enemies[i].physics.pos_y - BLOCK_SIZE + KILL_ZONE_Y) {
+                // The player has been hit
                 if (player.shield) {
                     player.shield = 0;
                     enemies[i].life--;
@@ -454,10 +458,11 @@ void app_main()
                      player.physics.pos_x > enemies[i].physics.pos_x - BLOCK_SIZE &&
                      player.physics.pos_y < enemies[i].physics.pos_y - BLOCK_SIZE + KILL_ZONE_Y &&
                      player.physics.pos_y > enemies[i].physics.pos_y - BLOCK_SIZE) {
+                // The enemy has been hit
                 enemies[i].life--;
-                player.physics.jumping = 1;
-                player.physics.falling = 0;
-                player.physics.speed_y = 1;
+                if (initiate_jump(&player.physics, SPEED_INITIAL)) {
+                    return;
+                }
                 player.timer = (uint32_t)game.timer;
             }
             // Check for lightstaff's usage
@@ -468,14 +473,58 @@ void app_main()
                     enemies[i].life--;
                 }
             }
+            // Initiate shoot if possible
+            if (enemies[i].stationary && !enemies[i].physics.falling &&
+                ((game.timer - enemies[i].timer_x) / COOLDOWN_SHOOT)) {
+                // Prepare the projectile
+                int8_t on_sight = is_on_sight(map, &enemies[i].physics, &player.physics);
+                if (on_sight == 1) {
+                    if (initiate_shoot(&enemies[i].physics, &player.physics)) {
+                        return;
+                    }
+                }
+                else if (on_sight == -1) {
+                    return;
+                }
+                enemies[i].timer_x = (uint32_t)game.timer;
+            }
         }
 
+
+        /*************************************************
+         * projectiles
+         *************************************************/
+        for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
+            if (projectiles[i].physics.speed_x == 0) {
+                continue;
+            }
+            // Update position
+            projectiles[i].physics.pos_x += projectiles[i].physics.speed_x;
+            projectiles[i].physics.pos_y = projectiles[i].slope * projectiles[i].physics.pos_x + projectiles[i].offset;
+            // Check for collision with the environment
+            int8_t collision = check_block_collisions(map, &projectiles[i].physics, game.map_row);
+            if (collision == 1) {
+                memset(&projectiles[i], 0, sizeof(projectiles[i]));
+            }
+            else if (collision == -1) {
+                return;
+            }
+            // Check for collision with the player
+            if (player.physics.pos_x < projectiles[i].physics.pos_x + BLOCK_SIZE / 2 + HITBOX_PROJECTILE / 2 &&
+                player.physics.pos_x > projectiles[i].physics.pos_x - BLOCK_SIZE / 2 - HITBOX_PROJECTILE / 2 &&
+                player.physics.pos_y < projectiles[i].physics.pos_y + BLOCK_SIZE / 2 + HITBOX_PROJECTILE / 2 &&
+                player.physics.pos_y > projectiles[i].physics.pos_y - BLOCK_SIZE / 2 - HITBOX_PROJECTILE / 2) {
+                    memset(&projectiles[i], 0, sizeof(projectiles[i]));
+                    player.life--;
+                    game.reset = 1;
+            }
+        }
 
         /*************************************************
          * Items states & positions update
          *************************************************/
         // Collision between items and the player
-        for (int i = 0; i < NUM_ITEMS; i++) {
+        for (uint8_t i = 0; i < NUM_ITEMS; i++) {
             if (!items[i].spawned || items[i].taken) {
                 continue;
             }
@@ -660,7 +709,7 @@ void app_main()
                                 }
                                 st7735s_draw_circle(circle);
                                 sprite.flip_x = 1;
-                                sprite.data = torch;
+                                sprite.data = sprite_torch;
                                 break;
                             default:
                                 break;
@@ -694,7 +743,7 @@ void app_main()
                                     circle.pos_x = row * BLOCK_SIZE - game.map_x + 5;
                                 }
                                 st7735s_draw_circle(circle);
-                                sprite.data = torch;
+                                sprite.data = sprite_torch;
                                 break;
                             default:
                                 break;
@@ -791,10 +840,26 @@ void app_main()
                 st7735s_draw_sprite(platform_right);
             }
         }
+        // Draw projectiles
+        for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
+            if (projectiles[i].physics.speed_x == 0) {
+                continue;
+            }
+            sprite_t sprite = {
+                .pos_x = projectiles[i].physics.pos_x - game.map_x,
+                .pos_y = projectiles[i].physics.pos_y,
+                .height = BLOCK_SIZE,
+                .width = BLOCK_SIZE,
+                .data = sprite_projectile,
+            };
+            if (projectiles[i].physics.speed_x < 0) {
+                sprite.flip_x = 1;
+            }
+            st7735s_draw_sprite(sprite);
+        }
         // Draw enemies
         for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
             if (enemies[i].life <= 0) {
-                memset(&enemies[i], 0, sizeof(enemies[i]));
                 continue;
             }
             sprite_t sprite = {
@@ -816,8 +881,13 @@ void app_main()
                     break;
                 case ENEMY_2:
                     switch (map.id) {
-                        case SHIRE: sprite.data = shire_enemy_1; break;
-                        case MORIA: sprite.data = moria_enemy_1; break;
+                        case MORIA: sprite.data = moria_enemy_2; break;
+                        default: break;
+                    }
+                    break;
+                case ENEMY_3:
+                    switch (map.id) {
+                        case MORIA: sprite.data = moria_enemy_2; break;
                         default: break;
                     }
                     break;

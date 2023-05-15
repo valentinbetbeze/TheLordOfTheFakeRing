@@ -1,13 +1,17 @@
 #include "game_engine.h"
 
+#define OUT_OF_RANGE(x)     (3 * LCD_WIDTH / 4 < x)
+
+
 block_t blocks[NUM_BLOCK_RECORDS];
 enemy_t enemies[NUM_ENEMY_RECORDS] = {0};
 item_t items[NUM_ITEMS] = {0};
 platform_t platforms[MAX_PLATFORMS] = {0};
+projectile_t projectiles[MAX_PROJECTILES] = {0};
 
 
 /*************************************************
- * Blocks
+ * 'Blocks' function definitions
  *************************************************/
 
 static uint8_t is_block_destroyed(int16_t row, int8_t column)
@@ -124,9 +128,9 @@ int8_t check_block_collisions(map_t map, physics_t *physics, uint16_t map_row)
         ref_col = 8;
         block_bl = map.data[ref_row][ref_col - 1];
         block_br = map.data[ref_row + 1][ref_col - 1];
-        if (block_bl) block_tl = NON_BREAKABLE_BLOCK_1;
+        if (IS_SOLID(block_bl)) block_tl = NON_BREAKABLE_BLOCK_1;
         else block_tl = BACKGROUND_BLOCK;
-        if (block_br) block_tr = NON_BREAKABLE_BLOCK_1;
+        if (IS_SOLID(block_br)) block_tr = NON_BREAKABLE_BLOCK_1;
         else block_tr = BACKGROUND_BLOCK;
     }
     else {
@@ -167,25 +171,20 @@ int8_t check_block_collisions(map_t map, physics_t *physics, uint16_t map_row)
     }
 
     // Check for collisions
-    physics->top_collision =    (collision_risk.top && IS_SOLID(block_tl) &&
-                                !is_block_destroyed(ref_row, ref_col) &&
-                                x_offset < BLOCK_SIZE - abs(physics->speed_x) - SLIP_OFFSET) ||
-                                (collision_risk.top && abs(physics->speed_x) + SLIP_OFFSET < x_offset &&
-                                IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col));
+    physics->top_collision =        (collision_risk.top && IS_SOLID(block_tl) &&
+                                    !is_block_destroyed(ref_row, ref_col) &&
+                                    x_offset < BLOCK_SIZE - abs(physics->speed_x) - SLIP_OFFSET) ||
+                                    (collision_risk.top && abs(physics->speed_x) + SLIP_OFFSET < x_offset &&
+                                    IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col));
 
-    physics->bottom_collision = (collision_risk.bottom && IS_SOLID(block_bl) &&
-                                !is_block_destroyed(ref_row, ref_col - 1) &&
-                                x_offset < BLOCK_SIZE - abs(physics->speed_x)) ||
-                                (collision_risk.bottom && abs(physics->speed_x) < x_offset &&
-                                IS_SOLID(block_br) && !is_block_destroyed(ref_row + 1, ref_col - 1));
+    physics->bottom_collision =     (collision_risk.bottom && IS_SOLID(block_bl) &&
+                                    !is_block_destroyed(ref_row, ref_col - 1) &&
+                                    x_offset < BLOCK_SIZE - abs(physics->speed_x)) ||
+                                    (collision_risk.bottom && abs(physics->speed_x) < x_offset &&
+                                    IS_SOLID(block_br) && !is_block_destroyed(ref_row + 1, ref_col - 1));
 
-    physics->left_collision =   (collision_risk.left && IS_SOLID(block_tl) && !is_block_destroyed(ref_row, ref_col)) ||
-                                (physics->grounded && x_offset &&
-                                (!IS_SOLID(block_bl) || is_block_destroyed(ref_row, ref_col - 1)));
-
-    physics->right_collision =  (collision_risk.right && IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col)) ||
-                                (physics->grounded && x_offset && 
-                                (!IS_SOLID(block_br) || is_block_destroyed(ref_row + 1, ref_col - 1)));
+    physics->left_collision =   (collision_risk.left && IS_SOLID(block_tl) && !is_block_destroyed(ref_row, ref_col));
+    physics->right_collision =  (collision_risk.right && IS_SOLID(block_tr) && !is_block_destroyed(ref_row + 1, ref_col));
                                 
     if (physics->jumping || physics->falling) {
         physics->left_collision |=  (collision_risk.left && y_offset && IS_SOLID(block_bl) && 
@@ -195,6 +194,13 @@ int8_t check_block_collisions(map_t map, physics_t *physics, uint16_t map_row)
         physics->right_collision |= (collision_risk.right && y_offset && IS_SOLID(block_br) && 
                                     !is_block_destroyed(ref_row + 1, ref_col - 1) &&
                                     (!IS_SOLID(block_bl) || is_block_destroyed(ref_row, ref_col - 1)));
+    }
+    else if (physics->grounded) {
+        physics->left_collision |=  ((IS_SOLID(block_br) && !is_block_destroyed(ref_row + 1, ref_col - 1)) &&
+                                    (!IS_SOLID(block_bl) || is_block_destroyed(ref_row, ref_col - 1)) && x_offset);
+
+        physics->right_collision |= ((IS_SOLID(block_bl) && !is_block_destroyed(ref_row, ref_col - 1)) &&
+                                    (!IS_SOLID(block_br) || is_block_destroyed(ref_row + 1, ref_col - 1)) && x_offset);
     }
     // Change interactive blocks state if appropriate
     if (physics->top_collision && IS_INTERACTIVE(block_tl) && !is_block_destroyed(ref_row, ref_col) &&
@@ -214,10 +220,10 @@ void fix_block_collision(physics_t *physics)
     uint8_t x_offset = physics->pos_x % BLOCK_SIZE;
     uint8_t y_offset = physics->pos_y % BLOCK_SIZE;
     // x-direction
-    if (physics->left_collision) {
+    if (physics->left_collision && physics->platform_i == -1) {
         physics->pos_x += BLOCK_SIZE - x_offset;
     }
-    else if (physics->right_collision) {
+    else if (physics->right_collision && physics->platform_i == -1) {
         physics->pos_x -= x_offset;
     }
     // y-direction
@@ -264,7 +270,7 @@ void bump_block(block_t *block, sprite_t *sprite, uint64_t timer)
 
 
 /*************************************************
- * Platforms
+ * 'Platforms' function definitions
  *************************************************/
 
 static uint8_t create_platform(map_t map, platform_t *platform)
@@ -319,6 +325,10 @@ static uint8_t create_platform(map_t map, platform_t *platform)
 
 platform_t *get_platform(int16_t row, int8_t column)
 {
+    if (row == -1 || column == -1) {
+        return NULL;
+    }
+
     for (int8_t i = 0; i < MAX_PLATFORMS; i++) {
         if (platforms[i].start_row <= row && row <= platforms[i].end_row &&
             platforms[i].start_column <= column && column <= platforms[i].end_column) {
@@ -370,15 +380,15 @@ uint8_t load_platforms(map_t map)
 }
 
 
-int8_t is_standing_on_platform(physics_t *physics)
+int8_t check_platform_collision(physics_t *physics)
 {
     if (physics == NULL) {
         printf("Error(check_block_collisions): `physics_t` entity cannot be found.\n");
-        return -2;
+        return -1;
     }
     for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
         // Abort if no more platforms to check
-        if (platforms[i].start_row == -1) {
+        if (platforms[i].start_row == -1 || physics->pos_x < (platforms[i].start_row - 1) * BLOCK_SIZE) {
             break;
         }
         // Check collision
@@ -398,63 +408,62 @@ int8_t is_standing_on_platform(physics_t *physics)
         if ((platforms[i].horizontal && on_platform_x && on_hplatform_y) ||
             (platforms[i].vertical && on_platform_x && on_vplatform_y)) {
             physics->bottom_collision = 1;
-            return i;
+            physics->platform_i = i;
+            if (physics->grounded) {
+                physics->left_collision |= (physics->pos_x < platforms[i].physics.pos_x);
+                physics->right_collision |= (platforms[i].physics.pos_x + BLOCK_SIZE < physics->pos_x);
+            }
+            return 1;
         }
     }
-    return -1;
+    physics->platform_i = -1;
+    return 0;
 }
 
 
 /*************************************************
- * Enemies / Player
+ * 'Enemies / Player' function definitions
  *************************************************/
 
-void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column)
+void set_stationary_enemy_orientation(map_t map, enemy_t *enemy)
 {
-    enemy->row                      = row;
-    enemy->column                   = column;
-    enemy->life                     = 1;
-    enemy->timer_x                  = 0;
-    enemy->timer_y                  = 0;
-    enemy->physics.top_collision    = 0;
-    enemy->physics.bottom_collision = 0;
-    enemy->physics.left_collision   = 0;
-    enemy->physics.right_collision  = 0;
-    enemy->physics.accelerating     = 0;
-    enemy->physics.falling          = 0;
-    enemy->physics.jumping          = 0;
-    enemy->physics.pos_x            = BLOCK_SIZE * row;
-    enemy->physics.pos_y            = BLOCK_SIZE * (NUM_BLOCKS_Y - 1 - column);
-    enemy->physics.speed_x          = -1 * SPEED_INITIAL;
-    enemy->physics.speed_y          = SPEED_INITIAL;
+    if (!enemy->stationary) {
+        return;
+    }
+    int8_t left_block = map.data[enemy->row - 1][enemy->column];
+    int8_t right_block = map.data[enemy->row + 1][enemy->column];
+    if (IS_SOLID(left_block) && !IS_SOLID(right_block)) {
+        enemy->physics.speed_x = 1;
+    }
+    else if (!IS_SOLID(left_block) && IS_SOLID(right_block)) {
+        enemy->physics.speed_x = -1;
+    }
+    else {
+        // Default orientation
+        printf("Warning(set_stationary_enemy_orientation): Cannot determine orientation for stationary enemy at row: %i, column: %i. Default orientation applied.\n", enemy->row, enemy->column);
+        enemy->physics.speed_x = -1;
+    }
 }
 
 
 uint8_t create_enemy_record(enemy_t enemy, uint16_t map_x)
 {
     // Scan the enemy log to create the state record of an enemy
-    int8_t index = -1;
-    uint8_t free_slot_found = 0;
     for (int8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
         if (enemies[i].row == enemy.row && enemies[i].column == enemy.column) {
-            return 1; // Enemy record already exists
+            printf("Error(create_enemy_record): Record cannot be created, enemy at row: %i, column: %i, already exists.\n", enemies[i].row, enemies[i].column);
+            return 1;
         }
-        else if (!free_slot_found && enemies[i].life == 0) {
-            index = i;
-            free_slot_found = 1;
-        }
-        // If the enemy is beyond the previous frame, clean the slot and write over it
-        else if (!free_slot_found && enemies[i].physics.pos_x < map_x - LCD_WIDTH) {
-            index = i;
+        else if (!enemies[i].row || enemies[i].physics.pos_x < map_x - LCD_WIDTH) {
+            /* If the slot is free (= 0) or the enemy is beyond the previous frame,
+            clean the slot and write over it */
+            memset(&enemies[i], 0, sizeof(enemies[i]));
+            enemies[i] = enemy;
+            return 0;
         }
     }
-    if (index == -1) {
-        printf("Error(create_enemy_record): Cannot add new enemy (enemies[] full).\n");
-        return 2;
-    }
-    memset(&enemies[index], 0, sizeof(enemies[index]));
-    enemies[index] = enemy;
-    return 0;
+    printf("Error(create_enemy_record): Record cannot be created, enemies[] array is full.\n");
+    return 1;
 }
 
 
@@ -468,27 +477,192 @@ enemy_t *get_enemy_record(int16_t row, int8_t column)
     return NULL; // Enemy not found
 }
 
-// end_row is excluded !
-void spawn_enemies(map_t map, uint16_t map_x, int16_t start_row, int16_t end_row)
+
+uint8_t spawn_enemies(map_t map, uint16_t map_x, int16_t start_row, int16_t end_row)
 {
     for (uint8_t row = start_row; row < end_row; row++) {
         for (int column = 0; column < NUM_BLOCKS_Y; column++) {
-            enemy_t enemy;
             if (!IS_ENEMY(map.data[row][column])) {
                 continue;
             }
-            else if (map.data[row][column] == ENEMY_2) {
+            if (get_enemy_record(row, column)) {
+                continue; // Enemy has already been spawned
+            }
+            enemy_t enemy = {
+                .row                = row,
+                .column             = column,
+                .life               = 1,
+                .physics.platform_i = -1,
+                .physics.speed_x    = -1 * SPEED_INITIAL,
+                .physics.speed_y    = SPEED_INITIAL
+            };
+            if (map.data[row][column] == ENEMY_2) {
                 enemy.physics.grounded = 1;
             }
-            initialize_enemy(&enemy, row, column);
-            create_enemy_record(enemy, map_x);
+            else if (map.data[row][column] == ENEMY_3) {
+                enemy.stationary =1;
+                set_stationary_enemy_orientation(map, &enemy);
+            }
+            // Check if the enemy is to be spawned on a platform
+            platform_t *platform = get_platform(row, column - 1);
+            if (platform == NULL) {
+                enemy.physics.pos_x = BLOCK_SIZE * row;
+                enemy.physics.pos_y = BLOCK_SIZE * (NUM_BLOCKS_Y - 1 - column);
+            }
+            else {
+                enemy.physics.pos_x = platform->physics.pos_x + BLOCK_SIZE;
+                enemy.physics.pos_y = platform->physics.pos_y - BLOCK_SIZE;
+            }
+            // Create the enemy record
+            if (create_enemy_record(enemy, map_x)) {
+                return 1;
+            }
         }
     }
+    return 0;
+}
+
+
+uint8_t initiate_jump(physics_t *physics, uint8_t initial_speed)
+{
+    if (physics == NULL) {
+        printf("Error(initiate_jump): `physics_t` entity cannot be found.\n");
+        return 1;
+    }
+    if (initial_speed * 2 >= BLOCK_SIZE) {
+        printf("Error(initiate_jump): Initial speed is too high. Max speed = (BLOCK_SIZE / 2) - 1\n");
+        return 1;
+    }
+    physics->jumping = 1;
+    physics->falling = 0;
+    physics->speed_y = initial_speed;
+    return 0;
+}
+
+
+int8_t is_on_sight(map_t map, physics_t *shooter, physics_t *target)
+{
+    if (shooter == NULL) {
+        printf("Error(is_on_sight): `physics_t` shooter cannot be found.\n");
+        return -1;
+    }
+    if (target == NULL) {
+        printf("Error(is_on_sight): `physics_t` target cannot be found.\n");
+        return -1;
+    }
+    // Check if on range
+    int16_t dist_x = target->pos_x - shooter->pos_x;
+    int16_t dist_y = target->pos_y - shooter->pos_y;
+    uint16_t dist = hypot(abs(dist_x), abs(dist_y));
+    if (OUT_OF_RANGE(dist)) {
+        return 0;
+    }
+
+    int16_t h_adja_block_row = shooter->pos_x / BLOCK_SIZE;
+    int16_t h_adja_block_col = NUM_BLOCKS_Y - (shooter->pos_y / BLOCK_SIZE) - 1;
+    int16_t v_adja_block_row = h_adja_block_row;
+    int16_t v_adja_block_col = h_adja_block_col;
+    // Scan the path between the shooter and the target
+    while (BLOCK_SIZE < dist) {       
+        if (0 < dist_x) h_adja_block_row++;
+        else if (dist_x < 0) h_adja_block_row--;
+        if (0 < dist_y) v_adja_block_col--;
+        else if (dist_y < 0) v_adja_block_col++; 
+        // Horizontal adjacent block
+        dist_x = target->pos_x - BLOCK_SIZE * h_adja_block_row;
+        dist_y = target->pos_y - BLOCK_SIZE * (NUM_BLOCKS_Y - h_adja_block_col - 1);
+        uint16_t h_adja_block_dist = hypot(abs(dist_x), abs(dist_y));
+        // Vertical adjacent block
+        dist_x = target->pos_x - BLOCK_SIZE * v_adja_block_row;
+        dist_y = target->pos_y - BLOCK_SIZE * (NUM_BLOCKS_Y - v_adja_block_col - 1);
+        uint16_t v_adja_block_dist = hypot(abs(dist_x), abs(dist_y));
+        // Check for solid block on the shortest path
+        if (h_adja_block_dist < v_adja_block_dist) {
+            if (IS_SOLID(map.data[h_adja_block_row][h_adja_block_col])) {
+                return 0; // Obstacle found
+            }
+            // If not solid, carry on the analysis
+            v_adja_block_row = h_adja_block_row;
+            v_adja_block_col = h_adja_block_col;
+            dist = h_adja_block_dist;
+        }
+        else if (v_adja_block_dist < h_adja_block_dist) {
+            if (IS_SOLID(map.data[v_adja_block_row][v_adja_block_col])) {
+                return 0; // Obstacle found
+            }
+            // If not solid, carry on the analysis
+            h_adja_block_row = v_adja_block_row;
+            h_adja_block_col = v_adja_block_col;
+            dist = v_adja_block_dist;
+        }
+        else {
+            if (IS_SOLID(map.data[h_adja_block_row][v_adja_block_col])) {
+                return 0; // Obstacle found
+            }
+            // If not solid, carry on the analysis
+            dist_x = target->pos_x - BLOCK_SIZE * h_adja_block_row;
+            dist_y = target->pos_y - BLOCK_SIZE * (NUM_BLOCKS_Y - v_adja_block_col - 1);
+            h_adja_block_col = v_adja_block_col;
+            v_adja_block_row = h_adja_block_row;
+            dist = hypot(abs(dist_x), abs(dist_y));
+        }
+    }
+    // If no block is solid, the target is on sight
+    return 1;
+}
+
+
+uint8_t initiate_shoot(physics_t *shooter, physics_t *target)
+{
+    if (shooter == NULL) {
+        printf("Error(initiate_shoot): `physics_t` shooter cannot be found.\n");
+        return 1;
+    }
+    if (target == NULL) {
+        printf("Error(initiate_shoot): `physics_t` target cannot be found.\n");
+        return 1;
+    }
+    // Create the projectile
+    int16_t dist_x = target->pos_x - shooter->pos_x;
+    int16_t dist_y = target->pos_y - shooter->pos_y;
+    projectile_t projectile = {0};
+    if (0 < dist_x) {
+        // The target is at the right of the shooter
+        projectile.physics.pos_x = shooter->pos_x + BLOCK_SIZE;
+        projectile.physics.speed_x = 1;
+    }
+    else {
+        // The target is at the left of the shooter
+        projectile.physics.pos_x = shooter->pos_x - BLOCK_SIZE;
+        projectile.physics.speed_x = -1;
+    }
+    projectile.physics.pos_y = shooter->pos_y;
+    projectile.slope = (float)dist_y / dist_x;
+    projectile.offset = shooter->pos_y - projectile.slope * shooter->pos_x;
+    // Store the projectile in memory
+    for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
+        if (projectiles[i].physics.speed_x == 0) {
+            projectiles[i] = projectile;
+            return 0;
+        }
+        else {
+            uint16_t dist_x = abs(projectiles[i].physics.pos_x - target->pos_x);
+            uint16_t dist_y = abs(projectiles[i].physics.pos_y - target->pos_y);
+            int16_t dist = hypot(dist_x, dist_y);
+            if (OUT_OF_RANGE(dist)) {
+                memset(&projectiles[i], 0, sizeof(projectiles[i]));
+                projectiles[i] = projectile;
+                return 0;
+            }
+        }
+    }
+    printf("Error(initiate_shoot): Could not create projectile (projectiles[] is full).\n");
+    return 1;
 }
 
 
 /*************************************************
- * Items
+ * 'Items' function definitions
  *************************************************/
 
 item_t generate_item(int16_t row, int8_t column, uint16_t map_x)

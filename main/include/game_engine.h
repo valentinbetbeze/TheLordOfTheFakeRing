@@ -30,7 +30,7 @@ typedef struct {
     uint8_t bottom_collision :  1;
     uint8_t left_collision :    1;
     uint8_t right_collision :   1;
-    uint8_t grounded :          1;      // Cannot fall or jump
+    uint8_t grounded :          1;      // Cannot fall in holes (enemies)
     uint8_t falling :           1;
     uint8_t jumping :           1;
     uint8_t accelerating :      1;
@@ -38,6 +38,7 @@ typedef struct {
     int16_t pos_y;
     int8_t speed_x;
     int8_t speed_y;
+    int8_t platform_i;                  // Index of the platfom the entity is standing on
 } physics_t;
 
 typedef struct {
@@ -62,9 +63,10 @@ typedef enum {
 } block_type_t;
 
 typedef struct {
-    uint8_t moved :             1;
     uint8_t horizontal :        1;
     uint8_t vertical :          1;
+    uint8_t moved :             1;
+    uint8_t changed_dir :       1;
     int16_t start_row;
     int16_t end_row;
     int8_t start_column;
@@ -75,6 +77,7 @@ typedef struct {
 
 typedef struct {
     int8_t life;
+    uint8_t stationary;
     int16_t row;
     int8_t column;
     uint32_t timer_x;
@@ -86,7 +89,15 @@ typedef enum {
     ENEMY_1 =                   (-30),
     ENEMY_2 =                   (-31),
     ENEMY_3 =                   (-32),
+    BOSS =                      (-33)
 } enemy_type_t;
+
+typedef struct {
+    float slope;
+    int32_t offset;
+    uint32_t timer;
+    physics_t physics;
+} projectile_t;
 
 typedef struct {
     uint8_t spawned :           1;
@@ -125,15 +136,22 @@ typedef struct {
 #define IS_INTERACTIVE(x)       (x >= BREAKABLE_BLOCK)
 #define IS_ENEMY(x)             (x <= ENEMY_1)
 
+#define PLATFORM_SIZE           (2 * BLOCK_SIZE) // In pixels
+
 
 /*************************************************
- * Prototypes
+ * Declarations
  *************************************************/
 
 extern block_t blocks[NUM_BLOCK_RECORDS];
 extern enemy_t enemies[NUM_ENEMY_RECORDS];
 extern item_t items[NUM_ITEMS];
 extern platform_t platforms[MAX_PLATFORMS];
+extern projectile_t projectiles[MAX_PROJECTILES];
+
+/*************************************************
+ * 'Blocks' function prototypes
+ *************************************************/
 
 void initialize_blocks_records(void);
 
@@ -160,19 +178,42 @@ void fix_block_collision(physics_t *physics);
 
 void bump_block(block_t *block, sprite_t *sprite, uint64_t timer);
 
+
+
+/*************************************************
+ * 'Platforms' functions prototypes
+ *************************************************/
+
 platform_t *get_platform(int16_t row, int8_t column);
 
 uint8_t load_platforms(map_t map);
 
-int8_t is_standing_on_platform(physics_t *physics);
+int8_t check_platform_collision(physics_t *physics);
 
-void initialize_enemy(enemy_t *enemy, int16_t row, int8_t column);
+
+
+/*************************************************
+ * 'Enemies / Player' function prototypes
+ *************************************************/
+
+void set_stationary_enemy_orientation(map_t map, enemy_t *enemy);
 
 uint8_t create_enemy_record(enemy_t enemy, uint16_t map_x);
 
 enemy_t *get_enemy_record(int16_t row, int8_t column);
 
-void spawn_enemies(map_t map, uint16_t map_x, int16_t start_row, int16_t end_row);
+uint8_t spawn_enemies(map_t map, uint16_t map_x, int16_t start_row, int16_t end_row);
+
+uint8_t initiate_jump(physics_t *physics, uint8_t initial_speed);
+
+int8_t is_on_sight(map_t map, physics_t *shooter, physics_t *target);
+
+uint8_t initiate_shoot(physics_t *shooter, physics_t *target);
+
+
+/*************************************************
+ * 'Items' function prototypes
+ *************************************************/
 
 item_t generate_item(int16_t row, int8_t column, uint16_t map_x);
 

@@ -189,9 +189,11 @@ void st7735s_fill_background(uint16_t color)
 
 void st7735s_draw_rectangle(rectangle_t rectangle)
 {
-    for (int x = rectangle.pos_x; x < (rectangle.pos_x + rectangle.width); x++) {
-        for (int y = rectangle.pos_y; y < (rectangle.pos_y + rectangle.height); y++) {
-            write_to_frame(x, y, rectangle.color, rectangle.alpha);
+    for (int y = 0; y < rectangle.height; y++) {
+        for (int x = 0; x < rectangle.width; x++) {
+            uint8_t pos_x = rectangle.pos_x + x;
+            uint8_t pos_y = rectangle.pos_y + y;
+            write_to_frame(pos_x, pos_y, rectangle.color, rectangle.alpha);
         }
     }
 }
