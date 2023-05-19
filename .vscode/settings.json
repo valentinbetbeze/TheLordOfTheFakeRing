@@ -48,6 +48,10 @@
         "random": "c",
         "stdint.h": "c",
         "stdio.h": "c",
-        "stdint-gcc.h": "c"
+        "stdint-gcc.h": "c",
+        "string.h": "c",
+        "game_engine_blocks.h": "c",
+        "game_engine_char.h": "c",
+        "game_engine_platforms.h": "c"
     }
 }

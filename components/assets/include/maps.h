@@ -14,16 +14,7 @@
 #include <stdint.h>
 
 #include "st7735s_graphics.h"
-
-
-/**
- * @brief A 'block' is a sprite representing an environmental element
- * of the game (stone, earth, grass, etc). It has fixed width and height
- * and is square.
- */
-#define BLOCK_SIZE          (16)       /* Block size in pixel            */
-#define NUM_BLOCKS_X        (10)       /* Number of blocks on the x-axis */
-#define NUM_BLOCKS_Y        (8)        /* Number of blocks on the y-axis */
+#include "game_engine.h"
 
 
 /*************************************************
@@ -33,15 +24,8 @@
 #define SHIRE               (1)
 #define MORIA               (2)
 
-typedef struct {
-    uint8_t id;
-    uint16_t background_color;
-    uint16_t rows;
-    uint8_t columns;
-    const int8_t (*data)[NUM_BLOCKS_Y];
-} map_t;
 
-extern map_t map_shire;
-extern map_t map_moria;
+extern const map_t map_shire;
+extern const map_t map_moria;
 
 #endif // __MAPS_H__

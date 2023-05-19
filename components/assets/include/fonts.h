@@ -14,12 +14,7 @@
 
 #include <stdint.h>
 
-/*************************************************
- * Font parameters
- *************************************************/
-#define FONT_SIZE           (6)         // in pixel
-#define FIRST_ASCII         (32)
-#define LAST_ASCII          (90)          
+#include "st7735s_graphics.h"
 
 
 /*************************************************

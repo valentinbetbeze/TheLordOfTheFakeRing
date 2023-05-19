@@ -19,11 +19,17 @@
 #include <math.h>
 
 #include "driver/spi_common.h"
-#include "project_config.h"
-#include "fonts.h"
+#include "st7735s_hal.h"
 
 
-#define PERCEIVED_BRIGHTNESS_THRESHOLD 45
+/*************************************************
+ * Font parameters
+ *************************************************/
+#define FONT_SIZE           (6)         // in pixel
+#define FIRST_ASCII         (32)
+#define LAST_ASCII          (90)
+#define LUMA_THRESHOLD      45
+
 
 /*************************************************
  * Color codes (RGB565)
@@ -88,7 +94,8 @@ typedef struct {
     uint16_t background;    // Background color, 0 for no background
     uint16_t color;         // Text color (16-bit format)
     float alpha;      
-    uint8_t size;           // Text size in bytes     
+    uint8_t size;           // Text size in bytes
+    const uint8_t (*font)[FONT_SIZE];
     const char *data;       // Ptr to char array
 } text_t;
 
@@ -116,43 +123,45 @@ typedef struct {
 /**
  * @brief Fill the background color of the frame.
  * 
- * @param color Background color
+ * @param[in] color Background color
  */
-void st7735s_fill_background(uint16_t color);
+void st7735s_fill_background(const uint16_t color);
 
 /**
  * @brief Draw a rectangle on the frame.
  * 
- * @param rectangle Rectangle object.
+ * @param[in] rectangle Pointer to the rectangle object the draw.
  */
-void st7735s_draw_rectangle(rectangle_t rectangle);
+void st7735s_draw_rectangle(const rectangle_t *rectangle);
 
 /**
  * @brief Draw a circle on the frame.
  * 
- * @param circle Circle object.
+ * @param[in] circle Pointer to the circle object the draw.
  */
-void st7735s_draw_circle(circle_t circle);
+void st7735s_draw_circle(const circle_t *circle);
 
 /**
  * @brief Display a text on the frame.
  * 
- * @param text Text object.
+ * @param[in] text Pointer to the text object the draw.
+ * 
  * @note 1. Padding on the x and y directions can be modified in the
  * project configuration header file (project_config.h).
  * @note 2. Currently, draw_text() only supports the use of one font.
  */
-void st7735s_draw_text(text_t text);
+void st7735s_draw_text(const text_t *text);
 
 /**
  * @brief Draw a sprite on the frame.
  * 
- * @param sprite Sprite object.
+ * @param[in] sprite Pointer to the sprite object the draw.
+ * 
  * @note  The color white, code 0xFFFF, is considered as 
  * transparent by the function, and hence will not be sent
  * to the frame.
  */
-void st7735s_draw_sprite(sprite_t sprite);
+void st7735s_draw_sprite(const sprite_t *sprite);
 
 
 #endif // __ST7735S_GRAPHICS_H__

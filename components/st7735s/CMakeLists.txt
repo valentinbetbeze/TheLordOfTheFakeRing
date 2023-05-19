@@ -7,8 +7,6 @@ set(LIB
     driver
     esp_rom
     esp_common
-    project_config
-    assets
 )
 
 idf_component_register(

@@ -12,7 +12,8 @@
 
 
 #include <stdint.h>
-#include "maps.h"
+
+#include "game_engine.h"
 
 
 /*************************************************
@@ -46,6 +47,8 @@ extern const uint16_t sprite_shield_edge[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_player[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_torch[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_projectile[BLOCK_SIZE*BLOCK_SIZE];
-
+extern const uint16_t sprite_ring_1[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t sprite_ring_2[BLOCK_SIZE*BLOCK_SIZE];
+extern const uint16_t sprite_ring_3[BLOCK_SIZE*BLOCK_SIZE];
 
 #endif // __SPRITES_H__

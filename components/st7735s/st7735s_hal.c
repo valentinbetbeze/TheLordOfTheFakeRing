@@ -6,34 +6,38 @@ uint16_t frame[NUM_TRANSACTIONS][PX_PER_TRANSACTION] = {0};
 /**
  * @brief Send a command to the ST7735S chip.
  * 
- * @param handle SPI device handle of the display.
- * @param command 8-bit command (see ST7735S datasheet p.104)
+ * @param[in] handle SPI device handle of the display.
+ * @param[in] command 8-bit command (see ST7735S datasheet p.104)
  */
-static void send_command(spi_device_handle_t handle, uint8_t command)
+static void send_command(const spi_device_handle_t handle, uint8_t const command)
 {
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.length = 8;
     transaction.tx_buffer = &command;
     
-    gpio_set_level(PIN_LCD_DC, 0); // Enable command mode
+    ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_DC, 0)); // Enable command mode
     ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
 }
 
 
 /**
- * @brief Send a byte to the ST7735S chip. // TODO: rename & description
+ * @brief Send a packet of 8-bit data to the ST7735S chip.
  * 
- * @param handle SPI device handle of the display.
- * @param data Pointer to the data to be sent.
- * @param len Amount of data in byte.
+ * @param[in] handle SPI device handle of the display.
+ * @param[in] data Pointer to the 8-bit data to be sent.
+ * @param[in] len Amount of data in byte.
+ * 
+ * @note This function is useful to send command arguments to the ST7735S
+ * driver, or 8-bit color format data. It is recommended to make use of the
+ * send_words() function if sending 16-bit color format data.
  */
-static void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len)
+static void send_bytes(const spi_device_handle_t handle, const uint8_t *data, const uint16_t len)
 {
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.length = 8 * len;
-    transaction.tx_buffer = data;
+    transaction.tx_buffer = (uint8_t *)data;
     
     gpio_set_level(PIN_LCD_DC, 1); // Enable data mode
     ESP_ERROR_CHECK(spi_device_polling_transmit(handle, &transaction));
@@ -41,15 +45,19 @@ static void send_byte(spi_device_handle_t handle, uint8_t *data, size_t len)
 
 
 /**
- * @brief Send a WORD (2 bytes) to the ST7735S chip.
+ * @brief Send a packet of 16-bit data to the ST7735S chip.
  * 
- * @param handle SPI device handle of the display.
- * @param data Pointer to the data to be sent.
- * @param len Amount of data in byte.
+ * @param[in] handle SPI device handle of the display.
+ * @param[in] data Pointer to the 16-bit data to be sent.
+ * @param[in] len Amount of data in byte.
  * 
- * @details //TODO: explain why send_byte & send_word (why 2 functions and not 1)
+ * @note send_words() shall be used instead of send_bytes() when 16-bit data,
+ * typically 16-bit color format, has to be sent. Making a single function for
+ * both 8-bit and 16-bit data input would require processing the size of the data
+ * and its length before initiating the SPI transaction. This would add unnecessary
+ * load onto the processor, hence the use of the two (rather similar) functions.
  */
-static void send_word(spi_device_handle_t handle, uint16_t *data, size_t len)
+static void send_words(const spi_device_handle_t handle, const uint16_t *data, const uint16_t len)
 {
     spi_transaction_t transaction;
     memset(&transaction, 0, sizeof(transaction));
@@ -71,7 +79,7 @@ void st7735s_init_pwm_backlight(void)
         .freq_hz                = PWM_LCD_FREQ,
         .clk_cfg                = LEDC_AUTO_CLK
     };
-    ledc_timer_config(&LCD_timer_config);
+    ESP_ERROR_CHECK(ledc_timer_config(&LCD_timer_config));
 
     // Prepare and then apply the LEDC PWM channel configuration
     ledc_channel_config_t LCD_timer_channel = {
@@ -83,7 +91,7 @@ void st7735s_init_pwm_backlight(void)
         .duty                   = 0,
         .hpoint                 = 0
     };
-    ledc_channel_config(&LCD_timer_channel);
+    ESP_ERROR_CHECK(ledc_channel_config(&LCD_timer_channel));
 }
 
 
@@ -94,19 +102,19 @@ void st7735s_set_backlight(uint8_t percent)
     }
     uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percent / 100;
     // Set duty cycle
-    ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty);
+    ESP_ERROR_CHECK(ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty));
     // Update duty to apply the new value
-    ledc_update_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL);
+    ESP_ERROR_CHECK(ledc_update_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL));
 }
 
 
-void st7735s_init_tft(spi_device_handle_t handle)
+void st7735s_init_tft(const spi_device_handle_t handle)
 {
     uint8_t parameter;
     // Hardware reset
-    gpio_set_level(PIN_LCD_RES, 0);
+    ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_RES, 0));
     ets_delay_us(10);
-    gpio_set_level(PIN_LCD_RES, 1);
+    ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_RES, 1));
     ets_delay_us(120*1000);
 
     // Reset software
@@ -120,18 +128,18 @@ void st7735s_init_tft(spi_device_handle_t handle)
     // Pixel format 16-bit
     send_command(handle, COLMOD);
     parameter = LCD_COLOR_FORMAT;
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // Frame rate control
     send_command(handle, FRMCTR1);
     uint8_t param_FRMCTRL1[3] = {LCD_RTNA, LCD_FPA, LCD_BPA};
-    send_byte(handle, param_FRMCTRL1, sizeof(param_FRMCTRL1));
+    send_bytes(handle, param_FRMCTRL1, sizeof(param_FRMCTRL1));
 
     // Memory data access control
     send_command(handle, MADCTL);
     parameter = ((LCD_MY << 7) | (LCD_MX << 6) | (LCD_MV << 5) |
                 (LCD_ML << 4) | (LCD_RGB << 3) | (LCD_MH << 2));
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // Display inversion off
     send_command(handle, INVOFF);
@@ -139,27 +147,27 @@ void st7735s_init_tft(spi_device_handle_t handle)
     // Power control 1 - Default applied
     send_command(handle, PWCTR1);
     uint8_t param_PWCTR1[3] = {0xA8, 0x08, 0x84};
-    send_byte(handle, param_PWCTR1, sizeof(param_PWCTR1));
+    send_bytes(handle, param_PWCTR1, sizeof(param_PWCTR1));
 
     // Power control 2 - Default applied
     send_command(handle, PWCTR2);
     parameter = 0xC0;
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // VCOM control - Default applied
     send_command(handle, VMCTR1);
     parameter = 0x05;
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // Display function control
     send_command(handle, INVCTR);
     parameter = 0x00;
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // Gamma curve
     send_command(handle, GAMSET);
     parameter = LCD_GAMMA; 
-    send_byte(handle, &parameter, sizeof(parameter));
+    send_bytes(handle, &parameter, sizeof(parameter));
 
     // Normal display mode ON
     send_command(handle, NORON);
@@ -170,19 +178,19 @@ void st7735s_init_tft(spi_device_handle_t handle)
     // Set all columns
     send_command(handle, CASET);
     uint8_t columns[4] = {0x00, 0x00, 0x00, 0x7F};
-    send_byte(handle, columns, sizeof(columns));
+    send_bytes(handle, columns, sizeof(columns));
 
     // Set all rows
     send_command(handle, RASET);
     uint8_t rows[4] = {0x00, 0x00, 0x00, 0x9F};
-    send_byte(handle, rows, sizeof(rows));
+    send_bytes(handle, rows, sizeof(rows));
 }
 
 
-void st7735s_push_frame(spi_device_handle_t handle)
+void st7735s_push_frame(const spi_device_handle_t handle)
 {
     send_command(handle, RAMWR);
     for (int i = 0; i < NUM_TRANSACTIONS; i++) {
-        send_word(handle, frame[i], MAX_TRANSFER_SIZE);
+        send_words(handle, frame[i], MAX_TRANSFER_SIZE);
     }
 }
