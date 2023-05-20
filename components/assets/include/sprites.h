@@ -1,7 +1,7 @@
 /**
  * @file sprites.h
  * @author valentin betbeze (valentin.betbeze@gmail.com)
- * @brief Header file containing the sprites data.
+ * @brief Header file containing the sprites external declarations.
  * @date 2023-04-22
  * 
  * @warning Do not modify any value between parenthesis '()'.
@@ -16,9 +16,6 @@
 #include "game_engine.h"
 
 
-/*************************************************
- * Sprites
- *************************************************/
 extern const uint16_t shire_block_water[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_block_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t shire_block_1_1[BLOCK_SIZE*BLOCK_SIZE];
@@ -50,5 +47,6 @@ extern const uint16_t sprite_projectile[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_ring_1[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_ring_2[BLOCK_SIZE*BLOCK_SIZE];
 extern const uint16_t sprite_ring_3[BLOCK_SIZE*BLOCK_SIZE];
+
 
 #endif // __SPRITES_H__

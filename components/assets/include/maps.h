@@ -17,14 +17,6 @@
 #include "game_engine.h"
 
 
-/*************************************************
- * Maps
- *************************************************/
-
-#define SHIRE               (1)
-#define MORIA               (2)
-
-
 extern const map_t map_shire;
 extern const map_t map_moria;
 

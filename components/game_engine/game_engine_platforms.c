@@ -81,6 +81,50 @@ static void configure_platform(const map_t *map, platform_t *platform)
 }
 
 
+/**
+ * @brief 
+ * 
+ * @param game 
+ * @param index 
+ */
+static void update_platform_x(const game_t *game, platform_t *platform)
+{
+    // The platform has reach the end of its course
+    if ((platform->physics.pos_x < platform->start_row * BLOCK_SIZE) ||
+        (platform->end_row * BLOCK_SIZE <= platform->physics.pos_x)) {
+
+        platform->physics.speed_x *= -1;
+        platform->changed_dir = 1;
+    }
+    // Update x-position
+    platform->physics.pos_x += platform->physics.speed_x;
+    platform->timer = (uint32_t)game->timer;
+    platform->moved = 1;
+}
+
+
+/**
+ * @brief 
+ * 
+ * @param game 
+ * @param platform
+ */
+static void update_platform_y(const game_t *game, platform_t *platform)
+{
+    const uint8_t start_y = LCD_HEIGHT - (platform->start_column + 1) * BLOCK_SIZE;
+    const uint8_t end_y = LCD_HEIGHT - (platform->end_column + 1) * BLOCK_SIZE;
+    // The platform has reach the end of its course
+    if (start_y < platform->physics.pos_y || platform->physics.pos_y <= end_y) {
+        platform->physics.speed_y *= -1;
+        platform->changed_dir = 1;
+    }
+    // Update y-position
+    platform->physics.pos_y += platform->physics.speed_y;
+    platform->timer = (uint32_t)game->timer;
+    platform->moved = 1;
+}
+
+
 uint8_t get_platform(uint8_t *index, const int16_t row, const int8_t column)
 {
     if (row == -1 || column == -1) {
@@ -143,42 +187,65 @@ void load_platforms(const map_t *map)
 }
 
 
-uint8_t check_platform_collision(physics_t *physics)
+void update_platform_position(const game_t *game, platform_t *platform)
+{
+    if (game == NULL) {
+        printf("Error(update_platform_position): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (platform == NULL) {
+        printf("Error(update_platform_position): platform_t pointer is NULL.\n");
+        assert(platform);
+    }
+    // Abort if no more platforms to update
+    platform->moved = 0;
+    platform->changed_dir = 0;
+    if (platform->start_row == -1) {
+        return;
+    }
+    else if (platform->vertical &&
+            (game->timer - platform->timer) / TIMESTEP_PLATFORM > 1) {
+        update_platform_y(game, platform);
+    }
+    else if (platform->horizontal &&
+            (game->timer - platform->timer) / TIMESTEP_PLATFORM > 1) {
+        update_platform_x(game, platform);
+    }
+}
+
+
+uint8_t check_platform_collision(physics_t *physics, platform_t *platform)
 {
     if (physics == NULL) {
         printf("Error(check_platform_collision): physics_t pointer is NULL.\n");
         assert(physics);
     }
-    for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
-        // Abort if no more platforms to check
-        if (platforms[i].start_row == -1 || physics->pos_x < (platforms[i].start_row - 1) * BLOCK_SIZE) {
-            break;
-        }
-        // Check collision
-        uint8_t on_platform_x, on_hplatform_y, on_vplatform_y;
-        on_platform_x = (platforms[i].physics.pos_x - BLOCK_SIZE + 2 < physics->pos_x) &&
-                        (physics->pos_x < platforms[i].physics.pos_x + 2 * BLOCK_SIZE - 2);
+    if (platform == NULL) {
+        printf("Error(check_platform_collision): platform_t pointer is NULL.\n");
+        assert(platform);
+    }
+    uint8_t on_platform_x, on_hplatform_y, on_vplatform_y;
+    on_platform_x = (platform->physics.pos_x - BLOCK_SIZE + 2 < physics->pos_x) &&
+                    (physics->pos_x < platform->physics.pos_x + 2 * BLOCK_SIZE - 2);
 
-        on_hplatform_y =    (platforms[i].physics.pos_y - BLOCK_SIZE < physics->pos_y) &&
-                            (physics->pos_y <= platforms[i].physics.pos_y - BLOCK_SIZE + physics->speed_y);
-        
-        on_vplatform_y = (
-            (platforms[i].moved && platforms[i].physics.pos_y - BLOCK_SIZE <= physics->pos_y &&
-            physics->pos_y <= platforms[i].physics.pos_y - BLOCK_SIZE - platforms[i].physics.speed_y + physics->speed_y)
-            ||  (!platforms[i].moved && platforms[i].physics.pos_y - BLOCK_SIZE < physics->pos_y &&
-                physics->pos_y <= platforms[i].physics.pos_y - BLOCK_SIZE + physics->speed_y));
- 
-        if ((platforms[i].horizontal && on_platform_x && on_hplatform_y) ||
-            (platforms[i].vertical && on_platform_x && on_vplatform_y)) {
-            physics->bottom_collision = 1;
-            physics->platform_i = i;
-            if (physics->grounded) {
-                physics->left_collision |= (physics->pos_x < platforms[i].physics.pos_x);
-                physics->right_collision |= (platforms[i].physics.pos_x + BLOCK_SIZE < physics->pos_x);
-            }
-            // Collision found
-            return 1;
+    on_hplatform_y =    (platform->physics.pos_y - BLOCK_SIZE < physics->pos_y) &&
+                        (physics->pos_y <= platform->physics.pos_y - BLOCK_SIZE + physics->speed_y);
+    
+    on_vplatform_y = (
+        (platform->moved && platform->physics.pos_y - BLOCK_SIZE <= physics->pos_y &&
+        physics->pos_y <= platform->physics.pos_y - BLOCK_SIZE - platform->physics.speed_y + physics->speed_y) ||
+        (!platform->moved && platform->physics.pos_y - BLOCK_SIZE < physics->pos_y &&
+        physics->pos_y <= platform->physics.pos_y - BLOCK_SIZE + physics->speed_y));
+
+    if ((platform->horizontal && on_platform_x && on_hplatform_y) ||
+        (platform->vertical && on_platform_x && on_vplatform_y)) {
+        // Collision found
+        physics->bottom_collision = 1;
+        if (physics->grounded) {
+            physics->left_collision |= (physics->pos_x < platform->physics.pos_x);
+            physics->right_collision |= (platform->physics.pos_x + BLOCK_SIZE < physics->pos_x);
         }
+        return 1;
     }
     // No collision found
     physics->platform_i = -1;

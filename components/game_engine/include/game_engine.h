@@ -58,18 +58,39 @@
  * Data structures
  *************************************************/
 
+typedef enum {
+    SHIRE =                     (1),
+    MORIA =                     (2)
+} map_id_t;
+
 /**
  * @brief The map_t object gathers all necessary information to manipulate 
  * and work with a map in the game engine functions.
  */
 typedef struct {
-    uint8_t id;
-    uint16_t background_color;
-    uint16_t nrows;                     // Number of rows
-    uint8_t ncolumns;                   // Number of columns
-    uint16_t end_row;                   // Row at which the player completes the map
+    const map_id_t id;
+    const uint16_t background_color;
+    const uint16_t start_row;           // Player's starting row
+    const uint8_t start_column;         // Player's starting column
+    const uint16_t nrows;               // Number of rows
+    const uint8_t ncolumns;             // Number of columns
+    const uint16_t end_row;             // Row at which the player completes the map
     const int8_t (*data)[NUM_BLOCKS_Y];
 } map_t;
+
+/**
+ * @brief Game state flags & variables.
+ */
+typedef struct {
+    uint8_t reset :         1;
+    uint8_t playing :       1;
+    uint8_t cam_moving :    1;
+    uint8_t coins;
+    uint16_t cam_pos_x;         // First pixel x-coordinate of the current map frame
+    uint16_t cam_row;           // First row of the current map frame
+    uint64_t timer;
+    const map_t *map;
+} game_t;
 
 /**
  * @brief The physics_t object is used to work with dynamic elements which
@@ -150,6 +171,37 @@ typedef enum {
 } item_type_t;
 
 /**
+ * @brief Struct handling the properties of a platform.
+ */
+typedef struct {
+    uint8_t horizontal :        1;
+    uint8_t vertical :          1;
+    uint8_t moved :             1;
+    uint8_t changed_dir :       1;
+    int16_t start_row;
+    int16_t end_row;
+    int8_t start_column;
+    int8_t end_column;
+    uint32_t timer;
+    physics_t physics;
+} platform_t;
+
+/**
+ * @brief Struct handling the properties of a projectile.
+ * 
+ * @param slope Coefficient of the linear equation characterizing the behaviour
+ * of the projectile's trajectory. Determined at the creation of the projectile_t object.
+ * @param offset Offset of the linear equation characterizing the behaviour of the 
+ * projectile's trajectory. Determined at the creation of the projectile_t object.
+ */
+typedef struct {
+    float slope;
+    int32_t offset;
+    uint32_t timer;
+    physics_t physics;
+} projectile_t;
+
+/**
  * @brief Struct for the character of the player. 
  */
 typedef struct {
@@ -163,7 +215,7 @@ typedef struct {
     uint32_t timer;
     physics_t physics;
     sprite_t sprite;
-} character_t;
+} player_t;
 
 /**
  * @brief Struct handling the properties of an enemy object.
@@ -191,37 +243,6 @@ typedef enum {
     BOSS =                      (-35)
 } enemy_type_t;
 
-/**
- * @brief Struct handling the properties of a projectile.
- * 
- * @param slope Coefficient of the linear equation characterizing the behaviour
- * of the projectile's trajectory. Determined at the creation of the projectile_t object.
- * @param offset Offset of the linear equation characterizing the behaviour of the 
- * projectile's trajectory. Determined at the creation of the projectile_t object.
- */
-typedef struct {
-    float slope;
-    int32_t offset;
-    uint32_t timer;
-    physics_t physics;
-} projectile_t;
-
-/**
- * @brief Struct handling the properties of a platform.
- */
-typedef struct {
-    uint8_t horizontal :        1;
-    uint8_t vertical :          1;
-    uint8_t moved :             1;
-    uint8_t changed_dir :       1;
-    int16_t start_row;
-    int16_t end_row;
-    int8_t start_column;
-    int8_t end_column;
-    uint32_t timer;
-    physics_t physics;
-} platform_t;
-
 
 /*************************************************
  * External variables
@@ -239,7 +260,39 @@ extern platform_t platforms[MAX_PLATFORMS];
 
 
 /*************************************************
- * Function prototypes (blocks/items)
+ * Item functions prototypes
+ *************************************************/
+
+/**
+ * @brief Store a given item in memory.
+ * 
+ * @param item Item to store in memory.
+ */
+void store_item(item_t *item);
+
+/**
+ * @brief Check if the player is collecting the given item.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param item Item to check.
+ * 
+ * @return 1 if the player is collecting the item, else 0.
+ */
+uint8_t is_player_collecting_item(game_t *game, player_t *player, item_t *item);
+
+/**
+ * @brief Collect the given item.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param item Item to check.
+ */
+void collect_item(player_t *player, item_t *item);
+
+
+/*************************************************
+ * Block functions prototypes
  *************************************************/
 
 /**
@@ -251,7 +304,7 @@ void initialize_blocks_records(void);
  * @brief Search and retrieve the desired block record index using the block's row
  * and column. The block record can then be accessed using the block index on blocks[].
  * 
- * @param[out] index Pointer to the block record index.
+ * @param[out] index Block record index.
  * @param[in] row Row of the block in the map.
  * @param[in] column Column of the block in the map.
  * 
@@ -273,8 +326,8 @@ uint8_t is_block_destroyed(const int16_t row, const int8_t column);
  * @brief Check for collisions between the physics_t object and its surrounding
  * blocks.
  * 
- * @param[in] map Pointer to the current game map.
- * @param[in] physics Pointer to the physics_t object to check for collisions.
+ * @param[in] map Current game map.
+ * @param[in] physics Entity on which to check for collisions.
  * @param[in] cam_row Row at which the camera is positioned.
  * 
  * @return 1 if collision, else 0.
@@ -289,81 +342,24 @@ uint8_t check_block_collisions(const map_t *map, physics_t *physics, const uint1
  * @brief Update the position of the given physics_t object, simulating reactive 
  * forces applied by one or several collisions with adjacent blocks.
  * 
- * @param physics Pointer to the physics_t object.
+ * @param physics Entity on which to apply the reactive force.
  */
 void apply_reactive_force(physics_t *physics);
 
-/**
- * @brief Animate the block by making it do a little bump in the air.
- * 
- * @param block Pointer to the block to animate.
- * @param sprite Pointer to the sprite of the block to animate.
- * @param timer Game timer for proper animation timing.
- * 
- * @warning The sprite and block pointers shall correspond, else the function
- * will not work as desired.
- */
-void bump_block(block_t *block, sprite_t *sprite, const uint64_t timer);
 
 /**
- * @brief Store a given item in memory.
+ * @brief Compute the state of an interactive block following a hit.
  * 
- * @param item Pointer to the item to store in memory.
+ * @param game 
+ * @param block 
+ * 
+ * @note Items are created and store in memory from this function.
  */
-void store_item(item_t *item);
+void compute_interactive_block(game_t *game, block_t *block);
 
 
 /*************************************************
- * Function prototypes (player/enemies)
- *************************************************/
-
-/**
- * @brief Spawn all enemies exisiting over the given range, between start_row and end_row.
- * The function will not spawn an enemy that has already been spawned.
- * 
- * @param map Pointer to the current game map.
- * @param cam_pos_x x-position of the camera in pixels.
- * @param start_row Row at which to start spawning enemies.
- * @param end_row Row at which to end spawning enemies (excluded).
- * 
- * @warning @p end_row is excluded from the range at which enemies are being spawned. This means enemies
- * are being spawned until (end_row - 1) included.
- */
-void spawn_enemies(const map_t *map, const uint16_t cam_pos_x, const int16_t start_row, const int16_t end_row);
-
-/**
- * @brief Set the state of the physics_t object to jumping.
- * 
- * @param physics Pointer to the physics_t object.
- * @param initial_speed Initial speed of the jump. Commonly known as v0.
- */
-void initiate_jump(physics_t *physics, const uint8_t initial_speed);
-
-/**
- * @brief Check if the shooter has the target on sight.
- * 
- * @param map Pointer to the current game map.
- * @param shooter Pointer to the physics_t object being the shooter.
- * @param target Pointer to the physics_t object being the target.
- * 
- * @return uint8_t 1 if on sight, else 0.
- * 
- * @note On sight means that the target is in range and that the path between
- * the shooter and the target is clear of solid blocks.
- */
-uint8_t is_on_sight(const map_t *map, physics_t *shooter, physics_t *target);
-
-/**
- * @brief Create, configure and store a projectile_t object in memory.
- * 
- * @param shooter Pointer to the physics_t object being the shooter.
- * @param target Pointer to the physics_t object being the target.
- */
-void shoot_projectile(const physics_t *shooter, const physics_t *target);
-
-
-/*************************************************
- * Function prototypes (platforms)
+ * Platform functions prototypes
  *************************************************/
 
 /**
@@ -385,18 +381,151 @@ uint8_t get_platform(uint8_t *index, const int16_t row, const int8_t column);
 /**
  * @brief Create, configure and load all of the map's platforms into memory.
  * 
- * @param map Pointer to the current game map.
+ * @param map Current game map.
  */
 void load_platforms(const map_t *map);
 
 /**
- * @brief Check for a collision between the physics_t object and the platforms
- * in memory.
+ * @brief Update the position of a given platform, depending on the type
+ * of platform and its course.
+ * 
+ * @param game Game flags.
+ * @param platform Platform to update.
+ */
+void update_platform_position(const game_t *game, platform_t *platform);
+
+/**
+ * @brief Check for a collision between the physics_t object and a platform.
  * 
  * @param physics Pointer to the physics_t object.
+ * @param platform Pointer to the platform_t object.
+ * 
  * @return 1 if collision found, else 0.
  */
-uint8_t check_platform_collision(physics_t *physics);
+uint8_t check_platform_collision(physics_t *physics, platform_t *platform);
+
+
+/*************************************************
+ * Projectile functions prototypes
+ *************************************************/
+
+/**
+ * @brief Create, configure and store a projectile_t object in memory.
+ * 
+ * @param shooter Entity shooting the projectile.
+ * @param target Entity being targeted by the shooter.
+ */
+void shoot_projectile(const physics_t *shooter, const physics_t *target);
+
+/**
+ * @brief  Compute the state and position of a projectile.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param projectile Projectile to update.
+ * 
+ * @note The function also checks if the projectile collides with the
+ * player, in which case the state of the player is modified.
+ */
+void compute_projectile(game_t *game, player_t *player, projectile_t *projectile);
+
+
+/*************************************************
+ * Player functions prototypes
+ *************************************************/
+
+/**
+ * @brief Check the state of the player and update its properties.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param is_jumping Boolean flag - 1 if the player shall jump, else 0.
+ */
+void check_player_state(game_t *game, player_t *player, const uint8_t is_jumping);
+
+/**
+ * @brief Update the position of the player.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param axis_value Post-processed value of the joystick x-axis.
+ * 
+ * @note The function also updates the position of the camera @p `game.cam_pos_x` 
+ * and @p `game.cam_row` depending on the position of the player.
+ */
+void update_player_position(game_t *game, player_t *player, const int8_t x_axis_value);
+
+
+/*************************************************
+ * Enemy functions prototypes
+ *************************************************/
+
+/**
+ * @brief Spawn all enemies exisiting over the given range, between start_row and end_row.
+ * The function will not spawn an enemy that has already been spawned.
+ * 
+ * @param map Current game map.
+ * @param cam_pos_x x-position of the camera in pixels.
+ * @param start_row Row at which to start spawning enemies.
+ * @param end_row Row at which to end spawning enemies (excluded).
+ * 
+ * @warning @p end_row is excluded from the range at which enemies are being spawned. This means enemies
+ * are being spawned until (end_row - 1) included.
+ */
+void spawn_enemies(const map_t *map, const uint16_t cam_pos_x, const int16_t start_row, const int16_t end_row);
+
+/**
+ * @brief Set the state of the physics_t object to jumping.
+ * 
+ * @param physics Entity that is going to jump.
+ * @param initial_speed Initial speed of the jump. Commonly known as v0.
+ */
+void initiate_jump(physics_t *physics, const uint8_t initial_speed);
+
+/**
+ * @brief Check if the shooter has the target on sight.
+ * 
+ * @param map Current game map.
+ * @param shooter Reference point from where to evaluate the line of sight.
+ * @param target Element that must be within the line of sight.
+ * 
+ * @return uint8_t 1 if on sight, else 0.
+ * 
+ * @note On sight means that the target is in range and that the path between
+ * the shooter and the target is clear of solid blocks.
+ */
+uint8_t is_on_sight(const map_t *map, physics_t *shooter, physics_t *target);
+
+
+/**
+ * @brief If still alive, compute all the properties of an enemy: states, 
+ * position, block collisions, platform collisions, and projectile shoots.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * @param enemy Enemy to update.
+ * 
+ * @note Projectile shoots are generated from this function as projectiles are
+ * created and initialized based on the shooter's properties (position, direction, 
+ * sight, etc.).
+ * The projectile is then updated every iteration with the 
+ */
+void compute_enemy(game_t *game, player_t *player, enemy_t *enemy);
+
+
+/*************************************************
+ * Display functions prototypes
+ *************************************************/
+
+/**
+ * @brief Draw a frame of the game. 
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * 
+ * @note Graphic assets drawn first will appear below other graphic assets.
+ */
+void build_frame(game_t *game, player_t *player);
 
 
 #endif // __GAME_ENGINE_H__

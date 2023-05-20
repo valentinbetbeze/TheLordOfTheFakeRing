@@ -1,7 +1,6 @@
 #include "game_engine.h"
+#include "esp_random.h"
 
-#define TIMESTEP_BUMP_BLOCK     5           // in milliseconds
-#define HEIGHT_BUMP_BLOCK       3           // Bump height of a block, in pixels
 
 /**
  * @warning Do not initialize to {0}: blocks[] has its own initialization
@@ -10,6 +9,115 @@
  */
 block_t blocks[NUM_BLOCK_RECORDS]; 
 item_t items[NUM_ITEMS] = {0};
+
+
+/*************************************************
+ * Item functions
+ *************************************************/
+
+/**
+ * @brief Generate an item randomly.
+ * 
+ * @param item Item to generate.
+ */
+static void generate_item_type(item_t *item)
+{
+    uint8_t random = esp_random() % 100;
+    if (random < 3) {
+        item->type = LIGHTSTAFF;
+    }
+    else if (random < 6) {
+        item->type = SHIELD;
+    }
+    else {
+        item->type = COIN;
+    }
+}
+
+
+void store_item(item_t *item)
+{
+    if (item == NULL) {
+        printf("Error(store_item): item_t pointer is NULL.\n");
+        assert(item);
+    }
+    // Scan the item log to store the item
+    int8_t index = -1;
+    for (int8_t i = 0; i < NUM_ITEMS; i++) {
+        if (!items[i].spawned || items[i].taken || items[i].sprite.pos_x < -BLOCK_SIZE) {
+            index = i;
+            break;
+        }
+    }
+    if (index == -1) {
+        printf("Error(store_item): Cannot add new item (items[] full).\n");
+        assert(0);
+    }
+    memset(&items[index], 0, sizeof(items[index]));
+    items[index] = *item;
+}
+
+
+uint8_t is_player_collecting_item(game_t *game, player_t *player, item_t *item)
+{
+    if (game == NULL) {
+        printf("Error(is_player_collecting_item): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (player == NULL) {
+        printf("Error(is_player_collecting_item): player_t pointer is NULL.\n");
+        assert(player);
+    }
+    if (item == NULL) {
+        printf("Error(is_player_collecting_item): item_t pointer is NULL.\n");
+        assert(item);
+    }
+    if (item->spawned && !item->taken &&
+        player->physics.pos_x - game->cam_pos_x < item->sprite.pos_x + item->sprite.width &&
+        player->physics.pos_x - game->cam_pos_x >= item->sprite.pos_x - item->sprite.width &&
+        player->physics.pos_y < item->sprite.pos_y + item->sprite.height &&
+        player->physics.pos_y >= item->sprite.pos_y - item->sprite.height) {
+        // Collision between the player and the item = collecting
+        return 1;
+    }
+    return 0;
+}
+
+
+void collect_item(player_t *player, item_t *item)
+{
+    if (player == NULL) {
+        printf("Error(check_item_collected): player_t pointer is NULL.\n");
+        assert(player);
+    }
+    if (item == NULL) {
+        printf("Error(check_item_collected): item_t pointer is NULL.\n");
+        assert(item);
+    }
+    switch (item->type) {
+        case LIGHTSTAFF:
+            if (player->lightstaff) {
+                player->coins += 20;
+            }
+            player->lightstaff = 1;
+            item->taken = 1;
+            break;
+        case SHIELD:
+            if (player->shield) {
+                player->coins += 20;
+            }
+            player->shield = 1;
+            item->taken = 1;
+            break;
+        default:
+            break;
+    }
+}
+
+
+/*************************************************
+ * Block functions
+ *************************************************/
 
 /**
  * @brief Create a block record and store it in memory.
@@ -260,56 +368,48 @@ void apply_reactive_force(physics_t *physics)
 }
 
 
-void bump_block(block_t *block, sprite_t *sprite, const uint64_t timer)
+void compute_interactive_block(game_t *game, block_t *block)
 {
+    if (game == NULL) {
+        printf("Error(compute_interactive_block): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (game->map == NULL) {
+        printf("Error(compute_interactive_block): map_t pointer is NULL.\n");
+        assert(game->map);
+    }
     if (block == NULL) {
-        printf("Error(bump_block): block_t pointer is NULL.\n");
+        printf("Error(compute_interactive_block): block_ pointer is NULL.\n");
         assert(block);
     }
-    if (sprite == NULL) {
-        printf("Error(bump_block): sprite_t pointer is NULL.\n");
-        assert(sprite);
-    }
-
-    static uint64_t t0 = 0;
-    static uint8_t steps = 0;
-    if ((timer - t0) / TIMESTEP_BUMP_BLOCK < 1) {
-        return;
-    }
-
-    steps++;
-    if (steps <= HEIGHT_BUMP_BLOCK) {
-        sprite->pos_y -= steps;
-    }
-    else if (steps <= HEIGHT_BUMP_BLOCK * 2) {
-        sprite->pos_y -= (HEIGHT_BUMP_BLOCK * 2 - steps);
-    }
-    else {
-        block->bumping = 0;
-        steps = 0;
-    }
-    t0 = timer;
-}
-
-
-void store_item(item_t *item)
-{
-    if (item == NULL) {
-        printf("Error(store_item): item_t pointer is NULL.\n");
-        assert(item);
-    }
-    // Scan the item log to store the item
-    int8_t index = -1;
-    for (int8_t i = 0; i < NUM_ITEMS; i++) {
-        if (!items[i].spawned || items[i].taken || items[i].sprite.pos_x < -BLOCK_SIZE) {
-            index = i;
+    switch (game->map->data[block->row][block->column]) {
+        case BREAKABLE_BLOCK:
+            block->destroyed = 1;
+            block->is_hit = 0;
             break;
-        }
+        case BONUS_BLOCK:
+            if (!block->item_given) {
+                item_t item = {
+                    .spawned = 1,
+                    .sprite.height = BLOCK_SIZE,
+                    .sprite.width = BLOCK_SIZE,
+                    .sprite.pos_x = BLOCK_SIZE * block->row - game->cam_pos_x,
+                    .sprite.pos_y = LCD_HEIGHT - (BLOCK_SIZE * (block->column + 1)) - 1,
+                };
+                generate_item_type(&item);
+                store_item(&item);
+                block->bumping = 1;
+                block->item_given = 1;
+            }
+            block->is_hit = 0;
+            break;
+        case RING:
+            block->bumping = 1;
+            block->item_given = 1;
+            block->is_hit = 0;
+            break;
+        default:
+            printf("Warning(set_block_flags_on_hit): You're trying to change the state of a block that cannot interact with external events. Block type: %i\n", game->map->data[block->row][block->column]);
+            break;
     }
-    if (index == -1) {
-        printf("Error(store_item): Cannot add new item (items[] full).\n");
-        assert(0);
-    }
-    memset(&items[index], 0, sizeof(items[index]));
-    items[index] = *item;
 }

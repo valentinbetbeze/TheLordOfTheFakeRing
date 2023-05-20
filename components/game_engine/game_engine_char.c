@@ -2,15 +2,203 @@
 
 #define OUT_OF_RANGE(x)     (3 * LCD_WIDTH / 4 < x)
 
+
 enemy_t enemies[NUM_ENEMY_RECORDS] = {0};
 projectile_t projectiles[MAX_PROJECTILES] = {0};
 
+
+/*************************************************
+ * Projectile functions
+ *************************************************/
+
+void shoot_projectile(const physics_t *shooter, const physics_t *target)
+{
+    if (shooter == NULL) {
+        printf("Error(shoot_projectile): physics_t `shooter` pointer is NULL.\n");
+        assert(shooter);
+    }
+    if (target == NULL) {
+        printf("Error(shoot_projectile): physics_t `target` pointer is NULL.\n");
+        assert(target);
+    }
+    // Create the projectile
+    projectile_t projectile = {0};
+    if (0 < target->pos_x - shooter->pos_x) {
+        // The target is at the right of the shooter
+        projectile.physics.pos_x = shooter->pos_x + BLOCK_SIZE;
+        projectile.physics.speed_x = 1;
+    }
+    else {
+        // The target is at the left of the shooter
+        projectile.physics.pos_x = shooter->pos_x - BLOCK_SIZE;
+        projectile.physics.speed_x = -1;
+    }
+    projectile.physics.pos_y = shooter->pos_y;
+    projectile.slope = (float)(target->pos_y - shooter->pos_y) / (target->pos_x - shooter->pos_x);
+    projectile.offset = shooter->pos_y - projectile.slope * shooter->pos_x;
+    projectile.physics.platform_i = -1;
+    // Store the projectile in memory
+    for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
+        if (projectiles[i].physics.speed_x == 0) {
+            projectiles[i] = projectile;
+            return;
+        }
+        else {
+            const uint16_t dist_x = abs(projectiles[i].physics.pos_x - target->pos_x);
+            const uint16_t dist_y = abs(projectiles[i].physics.pos_y - target->pos_y);
+            if (OUT_OF_RANGE(hypot((uint16_t)dist_x, (uint16_t)dist_y))) {
+                memset(&projectiles[i], 0, sizeof(projectiles[i]));
+                projectiles[i] = projectile;
+                return;
+            }
+        }
+    }
+    printf("Error(shoot_projectile): Could not create projectile (projectiles[] is full).\n");
+    assert(0);
+}
+
+
+void compute_projectile(game_t *game, player_t *player, projectile_t *projectile)
+{
+    if (game == NULL) {
+        printf("Error(update_projectile): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (player == NULL) {
+        printf("Error(update_projectile): player_t pointer is NULL.\n");
+        assert(player);
+    }
+    if (projectile == NULL) {
+        printf("Error(update_projectile): projectile_t pointer is NULL.\n");
+        assert(projectile);
+    }
+    if (projectile->physics.speed_x == 0) {
+        return;
+    }
+    // Update position
+    projectile->physics.pos_x += projectile->physics.speed_x;
+    projectile->physics.pos_y = projectile->slope * projectile->physics.pos_x + projectile->offset;
+    // Check for collision with the environment
+    if (check_block_collisions(game->map, &projectile->physics, game->cam_row)) {
+        memset(projectile, 0, sizeof(*projectile));
+    }
+    // Check for collision with the player
+    if (player->physics.pos_x < projectile->physics.pos_x + BLOCK_SIZE / 2 + HITBOX_PROJECTILE / 2 &&
+        player->physics.pos_x > projectile->physics.pos_x - BLOCK_SIZE / 2 - HITBOX_PROJECTILE / 2 &&
+        player->physics.pos_y < projectile->physics.pos_y + BLOCK_SIZE / 2 + HITBOX_PROJECTILE / 2 &&
+        player->physics.pos_y > projectile->physics.pos_y - BLOCK_SIZE / 2 - HITBOX_PROJECTILE / 2) {
+        memset(projectile, 0, sizeof(*projectile));
+        if (player->shield) {
+            player->shield = 0;
+        }
+        else {
+            player->life--;
+            game->reset = 1;
+        }
+    }
+}
+
+
+/*************************************************
+ * Player functions
+ *************************************************/
+
+void check_player_state(game_t *game, player_t *player, const uint8_t is_jumping)
+{
+    if (game == NULL) {
+        printf("Error(check_player_states): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (player == NULL) {
+        printf("Error(check_player_states): player_t pointer is NULL.\n");
+        assert(player);
+    }
+    // Check if the player fell
+    if (LCD_HEIGHT + BLOCK_SIZE <= player->physics.pos_y) {
+        player->life--;
+        game->reset = 1;
+        return;
+    }
+    if (player->physics.falling && player->physics.bottom_collision) {
+        player->physics.falling = 0;
+        player->physics.speed_y = SPEED_INITIAL;
+    }
+    else if ((player->physics.bottom_collision || player->physics.left_collision ||
+                player->physics.right_collision) && is_jumping) {
+        player->timer = (uint32_t)game->timer;
+        initiate_jump(&player->physics, SPEED_JUMP_INIT);
+    }
+    else if ((player->physics.jumping && player->physics.top_collision) ||
+            (player->physics.jumping && player->physics.speed_y == 0)) {
+        player->physics.jumping = 0;
+        player->physics.falling = 1;
+    }
+    else if (!player->physics.jumping && !player->physics.bottom_collision) {
+        player->physics.falling = 1;
+    }
+}
+
+
+void update_player_position(game_t *game, player_t *player, const int8_t x_axis_value)
+{
+    if (game == NULL) {
+        printf("Error(update_player_x): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (player == NULL) {
+        printf("Error(update_player_x): player_t pointer is NULL.\n");
+        assert(player);
+    }
+    // Update x-position
+    if (0 < x_axis_value / 100) {
+        player->forward = 1;
+    }
+    else if (x_axis_value / 100 < 0){
+        player->forward = 0;
+    }
+    player->physics.pos_x += player->physics.speed_x * (int16_t)(x_axis_value / 100);
+    if (player->physics.pos_x - game->cam_pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+        game->cam_moving = 1;
+        game->cam_pos_x += player->physics.speed_x; // Shift the map frame by 'speed_x' pixels
+        game->cam_row = (uint16_t)(game->cam_pos_x / BLOCK_SIZE);
+    }
+    else if (player->physics.pos_x < game->cam_pos_x) {
+        player->physics.pos_x = game->cam_pos_x;
+    }
+    else {
+        game->cam_moving = 0;
+    }
+    // Update y-position
+    player->physics.accelerating = (game->timer - player->timer) / TIMESTEP_ACCEL;
+    if (player->physics.jumping) {
+        if (player->physics.accelerating) {
+            player->timer = (uint32_t)game->timer;
+            player->physics.accelerating = 0;
+            player->physics.speed_y--; // Decelerating (due to gravity)
+        }
+        player->physics.pos_y -= player->physics.speed_y;
+    }
+    else {
+        if (player->physics.falling && player->physics.accelerating &&
+            player->physics.speed_y < BLOCK_SIZE / 2 - 1) {
+            player->timer = (uint32_t)game->timer;
+            player->physics.accelerating = 0;
+            player->physics.speed_y++;
+        }
+        player->physics.pos_y += player->physics.speed_y; // Gravity
+    }
+}
+
+
+/*************************************************
+ * Enemy functions
+ *************************************************/
 
 /**
  * @brief Set the orientation of a stationary enemy.
  * 
  * @param map Pointer to the current game map.
- * @param enemy Pointer of the enemy which position must be set.
+ * @param enemy Pointer of the enemy to orientate.
  * 
  * @note The function checks the adjacent blocks of the stationary enemy
  * to determine if it is facing any wall. If so, the enemy will face the
@@ -162,6 +350,110 @@ static uint8_t is_enemy_spawned(const int16_t row, const int8_t column)
 }
 
 
+/**
+ * @brief Update the state of an enemy.
+ * 
+ * @param enemy Pointer to the enemy_t object to update.
+ * 
+ * @return 1 if the enemy is dead, else 0
+ */
+static uint8_t update_enemy_state(enemy_t *enemy)
+{
+    if ((enemy->life == 0 && !enemy->physics.grounded) ||
+        (LCD_HEIGHT < enemy->physics.pos_y && !enemy->infinite_spawn)) {
+        memset(enemy, 0, sizeof(*enemy)); // Remove from memory
+        return 1;
+    }
+    else if (enemy->life == 0) {
+        return 1;
+    }
+    // Check if falling
+    if (!enemy->physics.bottom_collision) {
+        enemy->physics.falling = 1;
+    }
+    else if (enemy->physics.falling && enemy->physics.bottom_collision) {
+        enemy->physics.falling = 0;
+        enemy->physics.speed_y = SPEED_INITIAL;
+    }
+    return 0;
+}
+
+
+/**
+ * @brief Update the position of a given enemy.
+ * 
+ * @param game Pointer to the current game map.
+ * @param enemy Pointer to the enemy to update.
+ */
+static void update_enemy_position(game_t *game, enemy_t *enemy)
+{
+    // Update x-direction
+    const uint8_t turn_around = (!enemy->physics.falling && 
+                                (enemy->physics.left_collision || enemy->physics.right_collision));
+    if (turn_around) {
+        enemy->physics.speed_x *= -1;
+    }
+    // Update x-position
+    if (!enemy->stationary && !(enemy->infinite_spawn && enemy->physics.falling) && 
+        (((game->timer - enemy->timer_x) / TIMESTEP_ENEMY > 1) || turn_around)) {
+
+        enemy->timer_x = (uint32_t)game->timer;
+        enemy->physics.pos_x += enemy->physics.speed_x;
+    }
+    // Update y-position
+    enemy->physics.accelerating = (game->timer - enemy->timer_y) / TIMESTEP_ACCEL;
+    if (enemy->infinite_spawn && (5 * LCD_HEIGHT < enemy->physics.pos_y)) {
+        enemy->physics.pos_x = enemy->row * BLOCK_SIZE;
+        enemy->physics.pos_y = -1 * BLOCK_SIZE;
+        enemy->physics.speed_y = SPEED_INITIAL;
+        enemy->physics.falling = 1;
+    }
+    else if (enemy->physics.falling && enemy->physics.accelerating &&
+            enemy->physics.speed_y < BLOCK_SIZE / 2 - 1) {
+        enemy->physics.accelerating = 0;
+        enemy->physics.speed_y++;
+        enemy->timer_y = (uint32_t)game->timer;
+    }
+    enemy->physics.pos_y += enemy->physics.speed_y;
+}
+
+
+/**
+ * @brief Check for a collision between the given enemy and the player.
+ * 
+ * @param game Pointer to the current game map.
+ * @param player Pointer to the player_t object.
+ * @param enemy Pointer to the enemy_t object.
+ */
+static void check_enemy_player_collision(game_t *game, player_t *player, enemy_t *enemy)
+{
+    if (player->physics.pos_x < enemy->physics.pos_x + BLOCK_SIZE &&
+        player->physics.pos_x > enemy->physics.pos_x - BLOCK_SIZE &&
+        player->physics.pos_y < enemy->physics.pos_y + BLOCK_SIZE &&
+        player->physics.pos_y > enemy->physics.pos_y - BLOCK_SIZE + KILL_ZONE_Y) {
+        // The player has been hit
+        if (player->shield) {
+            player->shield = 0;
+            enemy->life--;
+        }
+        else {
+            player->life--;
+            game->reset = 1;
+            return;
+        }
+    }
+    else if (player->physics.pos_x < enemy->physics.pos_x + BLOCK_SIZE &&
+                player->physics.pos_x > enemy->physics.pos_x - BLOCK_SIZE &&
+                player->physics.pos_y < enemy->physics.pos_y - BLOCK_SIZE + KILL_ZONE_Y &&
+                player->physics.pos_y > enemy->physics.pos_y - BLOCK_SIZE) {
+        // The enemy has been hit
+        enemy->life--;
+        initiate_jump(&player->physics, SPEED_INITIAL);
+        player->timer = (uint32_t)game->timer;
+    }
+}
+
+
 void spawn_enemies(const map_t *map, const uint16_t cam_pos_x, const int16_t start_row, const int16_t end_row)
 {
     if (map == NULL) {
@@ -294,48 +586,68 @@ uint8_t is_on_sight(const map_t *map, physics_t *shooter, physics_t *target)
 }
 
 
-void shoot_projectile(const physics_t *shooter, const physics_t *target)
+void compute_enemy(game_t *game, player_t *player, enemy_t *enemy)
 {
-    if (shooter == NULL) {
-        printf("Error(shoot_projectile): physics_t `shooter` pointer is NULL.\n");
-        assert(shooter);
+    if (game == NULL) {
+        printf("Error(update_enemy): game_t pointer is NULL.\n");
+        assert(game);
     }
-    if (target == NULL) {
-        printf("Error(shoot_projectile): physics_t `target` pointer is NULL.\n");
-        assert(target);
+    if (player == NULL) {
+        printf("Error(update_enemy): player_t pointer is NULL.\n");
+        assert(player);
     }
-    // Create the projectile
-    projectile_t projectile = {0};
-    if (0 < target->pos_x - shooter->pos_x) {
-        // The target is at the right of the shooter
-        projectile.physics.pos_x = shooter->pos_x + BLOCK_SIZE;
-        projectile.physics.speed_x = 1;
+    if (enemy == NULL) {
+        printf("Error(update_enemy): enemy_t pointer is NULL.\n");
+        assert(enemy);
     }
-    else {
-        // The target is at the left of the shooter
-        projectile.physics.pos_x = shooter->pos_x - BLOCK_SIZE;
-        projectile.physics.speed_x = -1;
+
+    if (update_enemy_state(enemy)) {
+        return;
     }
-    projectile.physics.pos_y = shooter->pos_y;
-    projectile.slope = (float)(target->pos_y - shooter->pos_y) / (target->pos_x - shooter->pos_x);
-    projectile.offset = shooter->pos_y - projectile.slope * shooter->pos_x;
-    projectile.physics.platform_i = -1;
-    // Store the projectile in memory
-    for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
-        if (projectiles[i].physics.speed_x == 0) {
-            projectiles[i] = projectile;
-            return;
-        }
-        else {
-            const uint16_t dist_x = abs(projectiles[i].physics.pos_x - target->pos_x);
-            const uint16_t dist_y = abs(projectiles[i].physics.pos_y - target->pos_y);
-            if (OUT_OF_RANGE(hypot((uint16_t)dist_x, (uint16_t)dist_y))) {
-                memset(&projectiles[i], 0, sizeof(projectiles[i]));
-                projectiles[i] = projectile;
-                return;
-            }
+    update_enemy_position(game, enemy);
+    check_enemy_player_collision(game, player, enemy);
+    // Check for lightstaff's usage from the player
+    if (player->lightstaff && player->power_used) {
+        uint8_t dist_x = abs(player->physics.pos_x - enemy->physics.pos_x);
+        uint8_t dist_y = abs(player->physics.pos_y - enemy->physics.pos_y);
+        if (hypot(dist_x, dist_y) < player->spell_radius) {
+            enemy->life--;
         }
     }
-    printf("Error(shoot_projectile): Could not create projectile (projectiles[] is full).\n");
-    assert(0);
+    // Check for block collisions and update position if necessary
+    if (check_block_collisions(game->map, &enemy->physics, game->cam_row)) {
+        apply_reactive_force(&enemy->physics);
+    }
+    // Check if standing on a platform
+    for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
+        // Abort if no more platforms to check
+        if (platforms[i].start_row == -1 || 
+            enemy->physics.pos_x < (platforms[i].start_row - 1) * BLOCK_SIZE) {
+            break;
+        }
+        if (!check_platform_collision(&enemy->physics, &platforms[i])) {
+            continue;
+        }
+        // Collision with platform = "reactive force"
+        enemy->physics.pos_y -= enemy->physics.speed_y;
+        // If the platform moved, follow its movement
+        if (platforms[i].horizontal && platforms[i].moved && !platforms[i].changed_dir) {
+            enemy->physics.pos_x += platforms[i].physics.speed_x;
+        }
+        else if (platforms[i].horizontal && platforms[i].moved && platforms[i].changed_dir) {
+            enemy->physics.pos_x += 2 * platforms[i].physics.speed_x;
+        }
+        else if (platforms[i].vertical && platforms[i].moved) {
+            enemy->physics.pos_y += platforms[i].physics.speed_y;
+        }
+    }
+    // Initiate shoot if possible
+    if (game->map->data[enemy->row][enemy->column] == ENEMY_3 && !enemy->physics.falling &&
+        ((game->timer - enemy->timer_x) / COOLDOWN_SHOOT)) {
+        // Prepare the projectile
+        if (is_on_sight(game->map, &enemy->physics, &player->physics)) {
+            shoot_projectile(&enemy->physics, &player->physics);
+        }
+        enemy->timer_x = (uint32_t)game->timer;
+    }
 }
