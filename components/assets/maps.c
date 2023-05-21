@@ -201,10 +201,10 @@ const map_t map_shire = {
     .id = SHIRE,
     .background_color = SPI_SWAP_DATA_TX(0x9F1F, 16),
     .start_row = 1,
-    .start_column = 7,
+    .start_column = 9,
     .nrows = (uint16_t)sizeof(shire_data) / sizeof(shire_data[0]),
     .ncolumns = NUM_BLOCKS_Y,
-    .end_row = 175,
+    .end_row = 174,
     .data = shire_data,
 };
 
@@ -431,6 +431,6 @@ const map_t map_moria = {
     .start_column = 6,
     .nrows = (uint16_t)sizeof(moria_data) / sizeof(moria_data[0]),
     .ncolumns = NUM_BLOCKS_Y,
-    .end_row = 192,
+    .end_row = 191,
     .data = moria_data,
 };

@@ -297,11 +297,10 @@ void st7735s_draw_text(const text_t *text)
             /* Using the character ascii code (ex:65 for 'A'), get the
              corresponding letter sprite and iterate through each layer
              of the sprite. */
-            const uint8_t sprite_index = text->data[char_index]-FIRST_ASCII;
-
-            for (uint8_t layer_index = 0; layer_index < FONT_SIZE; layer_index++) {
-                uint8_t layer = text->font[sprite_index][layer_index];
-                px_pos_y = text->pos_y + layer_index;
+            const uint8_t sprite_index = text->data[char_index] - FIRST_ASCII;
+            for (uint8_t y = 0; y < FONT_SIZE; y++) {
+                uint8_t layer = text->font[sprite_index][y];
+                px_pos_y++;
                 // Extract each bit from bit field and write the pixel to the frame
                 for (int8_t bit = FONT_SIZE - 1; bit >= 0; bit--) {
                     px_pos_x    = text->pos_x
@@ -341,13 +340,12 @@ void st7735s_draw_text(const text_t *text)
                         px_pos_x =  text->pos_x
                                     + (char_index - offset) * (FONT_SIZE + TEXT_PADDING_X)
                                     - TEXT_PADDING_X + j;
-                        px_pos_y = text->pos_y - i - 1;
-                        write_to_frame(px_pos_x, px_pos_y, text->background, text->alpha);
-                        px_pos_y = text->pos_y + FONT_SIZE + i;
-                        write_to_frame(px_pos_x, px_pos_y, text->background, text->alpha);
+                        write_to_frame(px_pos_x, text->pos_y - i - 1, text->background, text->alpha);
+                        write_to_frame(px_pos_x, text->pos_y + FONT_SIZE + i, text->background, text->alpha);
                     }
                 }
             }
+            px_pos_y -= FONT_SIZE;
         }
     }
 }

@@ -185,19 +185,6 @@ static void set_block_as_hit(const int16_t row, const int8_t column, const uint1
 }
 
 
-void initialize_blocks_records(void)
-{
-    for (int i = 0; i < NUM_BLOCK_RECORDS; i++) {
-        blocks[i].row          = -1; // Empty slot identifier
-        blocks[i].column       = -1;
-        blocks[i].is_hit       = 0;
-        blocks[i].destroyed    = 0;
-        blocks[i].item_given   = 0;
-        blocks[i].bumping      = 0;
-    }
-}
-
-
 uint8_t get_block_record(uint8_t *index, const int16_t row, const int8_t column)
 {
     if (index == NULL) {

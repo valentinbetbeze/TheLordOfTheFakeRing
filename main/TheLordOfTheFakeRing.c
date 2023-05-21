@@ -13,8 +13,6 @@
 #include <math.h>
 
 #include "rom/ets_sys.h"
-#include "soc/timer_group_struct.h"
-#include "soc/timer_group_reg.h"
 #include "driver/gptimer.h"
 
 #include "gamepad.h"
@@ -28,9 +26,7 @@
 
 void app_main()
 {
-    /*************************************************
-     * Hardware initialization
-     *************************************************/
+    // Hardware initialization
     #pragma region
     // Initialize non-SPI GPIOs
     const gpio_config_t io_conf = {
@@ -91,18 +87,13 @@ void app_main()
     gamepad_init_button(&button_A, PIN_BTN_A);
     gamepad_init_button(&button_C, PIN_BTN_C);
     #pragma endregion
-
-
-    /*************************************************
-     * Game parameters initialization
-     *************************************************/
+    
+    // Game initialization & UI
     #pragma region
     game_t game = {
         .playing = 1,
         .map = &map_shire
     };
-
-    // Setup UI
     const char coins_text[] = "COIN: ";
     const text_t coins_text_object = {
         .pos_x = 5,
@@ -145,7 +136,7 @@ void app_main()
     };
 
     // Initialize and load game elements
-    initialize_blocks_records();
+    reset_records();
     load_platforms(game.map);
     spawn_enemies(game.map, game.cam_pos_x, game.cam_row, game.cam_row + NUM_BLOCKS_X + 1);
 
@@ -166,115 +157,88 @@ void app_main()
     };
     #pragma endregion
 
-    while(game.playing) {
+    // Start menu
+    while (!gamepad_poll_button(&button_A)) {
+        const char menu_txt1[] = "THE LORD OF\nTHE FAKE RING";
+        const char menu_txt2[] = "PRESS 'A' TO PLAY";
+        const text_t menu_txt1_obj = {
+            .color = RED,
+            .pos_x = 30,
+            .pos_y = 40,
+            .font = myFont,
+            .data = menu_txt1,
+            .size = sizeof(menu_txt1)
+        };
+        const text_t menu_txt2_obj = {
+            .color = GREY,
+            .pos_x = 20,
+            .pos_y = LCD_HEIGHT - 30,
+            .font = myFont,
+            .data = menu_txt2,
+            .size = sizeof(menu_txt2)
+        };
+        st7735s_draw_text(&menu_txt1_obj);
+        st7735s_draw_text(&menu_txt2_obj);
+        st7735s_push_frame(tft_handle);
+        feed_watchdog_timer();
+    }
+
+    // Game loop
+    while(player.life) {
         // Get the time for the current iteration
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
 
-        // Game state logic
-        #pragma region
-        if (player.life == 0) {
-            game.playing = 0;
-            break;
-        }
-        else if (game.reset) {
-            game.reset = 0;
-            game.cam_moving = 0;
-            game.cam_row = 0;
-            game.cam_pos_x = 0;
-            // Reset character state (except life!)
-            player.shield                       = 0;
-            player.lightstaff                   = 0;
-            player.forward                      = 1;
-            player.power_used                   = 0;
-            player.spell_radius                 = 0;
-            player.timer                        = 0;
-            player.coins                        = 0;
-            player.physics.pos_x                = game.map->start_row * BLOCK_SIZE;
-            player.physics.pos_y                = (NUM_BLOCKS_Y - game.map->start_column - 1) * BLOCK_SIZE;
-            player.physics.speed_x              = SPEED_INITIAL;
-            player.physics.speed_y              = SPEED_INITIAL;
-            player.physics.falling              = 0;
-            player.physics.jumping              = 0;
-            player.physics.top_collision        = 0;
-            player.physics.bottom_collision     = 0;
-            player.physics.left_collision       = 0;
-            player.physics.right_collision      = 0;
-            // Reset block states
-            initialize_blocks_records();
-            // Reset enemy records
-            for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
-                memset(&enemies[i], 0, sizeof(enemies[i]));
+        // Compute all game parameters & objects
+        if (game.playing) {
+            // Compute player
+            check_player_state(&game, &player, gamepad_poll_button(&button_C));
+            if (player.lightstaff && gamepad_poll_button(&button_A)) {
+                player.power_used = 1;
             }
-            // Reset first enemies
-            spawn_enemies(game.map, game.cam_pos_x, game.cam_row, game.cam_row + NUM_BLOCKS_X);
-            // Reset items
+            update_player_position(&game, &player, gamepad_read_joystick_axis(adc_handle, &joystick.axis_x));
+            if (check_block_collisions(game.map, &player.physics, game.cam_row)) {
+                apply_reactive_force(&player.physics);
+            }
+            for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
+                update_platform_position(&game, &platforms[i]);
+                if (check_platform_collision(&player.physics, &platforms[i])) {
+                    player.physics.platform_i = i;
+                    player.physics.pos_y -= player.physics.speed_y; // reactive force
+                    // If moving, follow the movement of the platform
+                    if (platforms[i].moved && platforms[i].horizontal) {
+                        player.physics.pos_x += platforms[i].physics.speed_x;
+                    }
+                    else if (platforms[i].moved && platforms[i].vertical) {
+                        player.physics.pos_y += platforms[i].physics.speed_y;
+                    }
+                }
+            }
+            // Compute interactive blocks that have been hit by the player
+            for (uint8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
+                if (!blocks[i].is_hit || blocks[i].row == -1 || blocks[i].column == -1) {
+                    continue;
+                }
+                compute_interactive_block(&game, &blocks[i]);
+            }
+            // Compute items
             for (uint8_t i = 0; i < NUM_ITEMS; i++) {
-                memset(&items[i], 0, sizeof(items[i]));
-            }
-            ets_delay_us(1*1000*1000);
-        }
-        // Reset hit flag for each blocks
-        for (uint8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
-            blocks[i].is_hit = 0;
-        }
-        #pragma endregion
-
-        // Compute player
-        #pragma region
-        check_player_state(&game, &player, gamepad_poll_button(&button_C));
-        update_player_position(&game, &player, gamepad_read_joystick_axis(adc_handle, &joystick.axis_x));
-        if (check_block_collisions(game.map, &player.physics, game.cam_row)) {
-            apply_reactive_force(&player.physics);
-        }
-        // Update platform position & check for collision with the player
-        for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
-            update_platform_position(&game, &platforms[i]);
-            if (check_platform_collision(&player.physics, &platforms[i])) {
-                player.physics.platform_i = i; // FIXME: is it still worth using platform_i?
-                player.physics.pos_y -= player.physics.speed_y; // "reactive force"
-                // If moving, follow the movement of the platform
-                if (platforms[i].moved && platforms[i].horizontal) {
-                    player.physics.pos_x += platforms[i].physics.speed_x;
-                }
-                else if (platforms[i].moved && platforms[i].vertical) {
-                    player.physics.pos_y += platforms[i].physics.speed_y;
+                if (is_player_collecting_item(&game, &player, &items[i])) {
+                    collect_item(&player, &items[i]);
                 }
             }
-        }
-        // Check for lightstaff usage
-        if (player.lightstaff && gamepad_poll_button(&button_A)) {
-            player.power_used = 1;
-        }
-        #pragma endregion
-
-        // Compute interactive blocks that have been hit by the player
-        for (uint8_t i = 0; i < NUM_BLOCK_RECORDS; i++) {
-            if (!blocks[i].is_hit || blocks[i].row == -1 || blocks[i].column == -1) {
-                continue;
+            // Spawn & compute enemies
+            spawn_enemies(game.map, game.cam_pos_x, SPAWN_START(game.cam_row), SPAWN_END(game.cam_row) + 1);
+            for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
+                compute_enemy(&game, &player, &enemies[i]);
             }
-            compute_interactive_block(&game, &blocks[i]);
-        }
-
-        // Compute items
-        for (uint8_t i = 0; i < NUM_ITEMS; i++) {
-            if (is_player_collecting_item(&game, &player, &items[i])) {
-                collect_item(&player, &items[i]);
+            // Compute projectiles
+            for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
+                compute_projectile(&game, &player, &projectiles[i]);
             }
         }
 
-        // Spawn & compute enemies
-        spawn_enemies(game.map, game.cam_pos_x, SPAWN_START(game.cam_row), SPAWN_END(game.cam_row) + 1);
-        for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-            compute_enemy(&game, &player, &enemies[i]);
-        }
-
-        // Compute projectiles
-        for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
-            compute_projectile(&game, &player, &projectiles[i]);
-        }
-
-        // Frame construction
+        // Build the frame
         build_frame(&game, &player);
         st7735s_draw_text(&coins_text_object);
         st7735s_draw_text(&life_text_object);
@@ -282,13 +246,99 @@ void app_main()
         sprintf(num_life_text, "%i", (uint8_t)player.life);
         st7735s_draw_text(&coins_object);
         st7735s_draw_text(&life_object);
+        draw_player(&game, &player);
+        
+        // Check & update game state
+        #pragma region
+        if (!game.playing || game.map->end_row * BLOCK_SIZE < player.physics.pos_x) {
+            switch (game.map->id) {
+                case SHIRE:
+                    game.playing = 0;
+                    if (transition_screen(BLACK, 1)) {
+                        const char transition_txt[] = "THE MINES\nOF MORIA";
+                        const text_t transition_txt_obj = {
+                            .color = LIGHT_BLUE,
+                            .font = myFont,
+                            .pos_x = LCD_WIDTH / 2 - FONT_SIZE * 5,
+                            .pos_y = LCD_HEIGHT / 2 - TEXT_PADDING_Y / 2 - FONT_SIZE,
+                            .data = transition_txt,
+                            .size = sizeof(transition_txt)
+                        };
+                        st7735s_draw_text(&transition_txt_obj);
+                        st7735s_push_frame(tft_handle);
+                        ets_delay_us(4*1000*1000);
+                        game.init = 1;
+                        game.map = &map_moria;
+                    }
+                    break;
+                case MORIA:
+                    game.playing = 0; 
+                    if (player.physics.pos_x == game.map->start_row * BLOCK_SIZE) {
+                        if (transition_screen(BLACK, 0)) {
+                            game.playing = 1;
+                        }
+                    }
+                    else if (transition_screen(WHITE, 1)) {
+                        const char transition_txt[] = "THE FOREST\nOF LORIEN\n\n\nTO BE\nCONTINUED...";
+                        const text_t transition_txt_obj = {
+                            .color = DARK_GREEN,
+                            .font = myFont,
+                            .pos_x = LCD_WIDTH / 2 - FONT_SIZE * 6,
+                            .pos_y = LCD_HEIGHT / 2 - 3 * (TEXT_PADDING_Y / 2 + FONT_SIZE),
+                            .data = transition_txt,
+                            .size = sizeof(transition_txt)
+                        };
+                        st7735s_draw_text(&transition_txt_obj);
+                        st7735s_push_frame(tft_handle);
+                        player.life = 0; // Game is finished
+                        game.won = 1;
+                    }
+                    break;
+            }
+        }
+        if (game.reset) {
+            reset_game_flags(&game);
+            reset_player(&game, &player);
+            reset_records();
+            load_platforms(game.map);
+            spawn_enemies(game.map, game.cam_pos_x, game.cam_row, game.cam_row + NUM_BLOCKS_X);
+            ets_delay_us(1*1000*1000);
+        }
+        else if (game.init) {
+            game.coins              += player.coins;
+            player.coins            = 0;
+            player.physics.pos_x    = game.map->start_row * BLOCK_SIZE;
+            player.physics.pos_y    = (NUM_BLOCKS_Y - game.map->start_column - 1) * BLOCK_SIZE;
+            player.physics.speed_x  = SPEED_INITIAL;
+            player.physics.speed_y  = SPEED_INITIAL;
+            player.physics.falling  = 0;
+            player.physics.jumping  = 0;
+            reset_game_flags(&game);
+            reset_records();
+            load_platforms(game.map);
+            spawn_enemies(game.map, game.cam_pos_x, game.cam_row, game.cam_row + NUM_BLOCKS_X);
+        }
+        reset_hit_flag_blocks();
+        #pragma endregion
 
         // Send the frame to the display
         st7735s_push_frame(tft_handle);
+        feed_watchdog_timer();
+    }
 
-        // Feed the task watchdog timer
-        TIMERG0.wdtwprotect.wdt_wkey = TIMG_WDT_WKEY_VALUE;
-        TIMERG0.wdtfeed.wdt_feed = 1;
-        TIMERG0.wdtwprotect.wdt_wkey = 0;
+    // Game over screen
+    if (!game.won) {
+        const char game_over_txt[] = "GAME OVER";
+        const text_t game_over_txt_obj = {
+            .color = WHITE,
+            .font = myFont,
+            .pos_x = LCD_WIDTH / 2 - FONT_SIZE * sizeof(game_over_txt) / 2,
+            .pos_y = LCD_HEIGHT / 2 - FONT_SIZE / 2,
+            .data = game_over_txt,
+            .size = sizeof(game_over_txt)
+        };
+        st7735s_fill_background(BLACK);
+        st7735s_draw_text(&game_over_txt_obj);
+        st7735s_push_frame(tft_handle);
     }
 }

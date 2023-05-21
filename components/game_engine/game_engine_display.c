@@ -477,14 +477,51 @@ static void draw_enemy(const game_t *game, const enemy_t *enemy)
 }
 
 
-/**
- * @brief Draw the player on the frame.
- * 
- * @param game Game flags.
- * @param player Player's character.
- */
-static void draw_player(const game_t *game, player_t *player)
+uint8_t transition_screen(const uint16_t color, const uint8_t fade_in)
 {
+    static uint8_t steps = 0;
+    rectangle_t rectangle = {
+        .width = LCD_WIDTH,
+        .height = LCD_HEIGHT,
+        .pos_x = 0,
+        .pos_y = 0,
+        .color = color,
+    };
+    // On-going transition
+    if (steps < 100) {
+        if (fade_in) {
+            rectangle.alpha = (float)(100 - steps) / 100;
+        }
+        else {
+            rectangle.alpha = (float)steps / 100;
+        }
+        st7735s_draw_rectangle(&rectangle);
+        steps += 2;
+        return 0;
+    }
+    // Transition complete
+    if (fade_in) {
+        rectangle.alpha = 0;
+    }
+    else {
+        rectangle.alpha = 1;
+    }
+    st7735s_draw_rectangle(&rectangle);
+    steps = 0;
+    return 1;
+}
+
+
+void draw_player(const game_t *game, player_t *player)
+{
+    if (game == NULL) {
+        printf("Error(draw_player): game_t pointer is NULL.\n");
+        assert(game);
+    }
+    if (player == NULL) {
+        printf("Error(draw_player): player_t pointer is NULL.\n");
+        assert(player);
+    }
     player->sprite.pos_x = player->physics.pos_x - game->cam_pos_x;
     player->sprite.pos_y = player->physics.pos_y;
     if (player->shield) {
@@ -597,7 +634,7 @@ void build_frame(game_t *game, player_t *player)
     }
     // Draw blocks
     for (uint8_t row = game->cam_row; row <= game->cam_row + NUM_BLOCKS_X; row++) {
-        if (game->map->end_row < row) {
+        if (game->map->nrows - 1 < row) {
             break;
         }
         for (int column = 0; column < NUM_BLOCKS_Y; column++) {
@@ -619,6 +656,4 @@ void build_frame(game_t *game, player_t *player)
     for (uint8_t i = 0; i < NUM_ENEMY_RECORDS; i++) {
         draw_enemy(game, &enemies[i]);
     }
-    // Draw player
-    draw_player(game, player);
 }

@@ -82,9 +82,11 @@ typedef struct {
  * @brief Game state flags & variables.
  */
 typedef struct {
-    uint8_t reset :         1;
-    uint8_t playing :       1;
-    uint8_t cam_moving :    1;
+    uint8_t won :           1;
+    uint8_t reset :         1;  // Reset the character at the beginning of the map
+    uint8_t init :          1;  // Initialize a game map
+    uint8_t playing :       1;  // The game is running & the player has full control of its characte
+    uint8_t cam_moving :    1;  // The camera is moving
     uint8_t coins;
     uint16_t cam_pos_x;         // First pixel x-coordinate of the current map frame
     uint16_t cam_row;           // First row of the current map frame
@@ -260,6 +262,47 @@ extern platform_t platforms[MAX_PLATFORMS];
 
 
 /*************************************************
+ * Utility functions prototypes
+ *************************************************/
+
+/**
+ * @brief Reset the watchdog timer by writing to the TIMERG0 register.
+ */
+void feed_watchdog_timer(void);
+
+/**
+ * @brief Reset the player's character properties.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ * 
+ * @note Does not reset the player's life!
+ */
+void reset_player(game_t *game, player_t *player);
+
+/**
+ * @brief Reset all game flags.
+ * 
+ * @param game Game flags.
+ */
+void reset_game_flags(game_t *game);
+
+/**
+ * @brief Reset hit flags of each block records.
+ * 
+ * @note This function shall be used once per iteration (preferably at
+ * the beginning) to release a block from its temporary hit flag, else
+ * the block may not be abl to interact properly with future events.
+ */
+void reset_hit_flag_blocks(void);
+
+/**
+ * @brief Reset all record logs.
+ */
+void reset_records(void);
+
+
+/*************************************************
  * Item functions prototypes
  *************************************************/
 
@@ -294,11 +337,6 @@ void collect_item(player_t *player, item_t *item);
 /*************************************************
  * Block functions prototypes
  *************************************************/
-
-/**
- * @brief Initialize all block records. 
- */
-void initialize_blocks_records(void);
 
 /**
  * @brief Search and retrieve the desired block record index using the block's row
@@ -350,8 +388,8 @@ void apply_reactive_force(physics_t *physics);
 /**
  * @brief Compute the state of an interactive block following a hit.
  * 
- * @param game 
- * @param block 
+ * @param game Game flags.
+ * @param block Interative block to update.
  * 
  * @note Items are created and store in memory from this function.
  */
@@ -461,7 +499,7 @@ void update_player_position(game_t *game, player_t *player, const int8_t x_axis_
  *************************************************/
 
 /**
- * @brief Spawn all enemies exisiting over the given range, between start_row and end_row.
+ * @brief Spawn all enemies existing over the given range, between start_row and end_row.
  * The function will not spawn an enemy that has already been spawned.
  * 
  * @param map Current game map.
@@ -516,6 +554,25 @@ void compute_enemy(game_t *game, player_t *player, enemy_t *enemy);
 /*************************************************
  * Display functions prototypes
  *************************************************/
+
+/**
+ * @brief Create a transition animation that can either be fade in or fade
+ * out of a given color.
+ * 
+ * @param color Color to transition to/from.
+ * @param fade_in 1 to fade in, 0 to fade out from the given color.
+ * 
+ * @return 1 if the animation is complete, else 0.
+ */
+uint8_t transition_screen(const uint16_t color, const uint8_t fade_in);
+
+/**
+ * @brief Draw the player on the frame.
+ * 
+ * @param game Game flags.
+ * @param player Player's character.
+ */
+void draw_player(const game_t *game, player_t *player);
 
 /**
  * @brief Draw a frame of the game. 

@@ -4,20 +4,6 @@ platform_t platforms[MAX_PLATFORMS] = {0};
 
 
 /**
- * @brief Remove a platform from memory.
- * 
- * @param index Index of the platform to delete.
- */
-static void delete_platform(const uint8_t index)
-{
-    platforms[index].start_row = -1;
-    platforms[index].start_column = -1;
-    platforms[index].end_row = platforms[index].start_row;
-    platforms[index].end_column = platforms[index].start_column;
-}
-
-
-/**
  * @brief Configure a platform. The function scans the map and sets the
  * members of the platform_t variable to reflect the platform's path. 
  * 
@@ -152,10 +138,6 @@ void load_platforms(const map_t *map)
     if (map->data == NULL) {
         printf("Error(load_platforms): Map data pointer is NULL.\n");
         assert(map->data);
-    }
-    // Initialize array
-    for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
-        delete_platform(i);
     }
     // Scan the map to find and create platforms
     uint8_t index_platform = 0;
