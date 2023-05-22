@@ -53,6 +53,9 @@
         "game_engine_blocks.h": "c",
         "game_engine_char.h": "c",
         "game_engine_platforms.h": "c",
-        "app_main.h": "c"
+        "spi_common.h": "c",
+        "mh-fmd_driver.h": "c",
+        "musics.h": "c",
+        "assert.h": "c"
     }
 }

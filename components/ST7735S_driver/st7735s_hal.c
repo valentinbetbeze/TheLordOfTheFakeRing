@@ -75,7 +75,7 @@ void st7735s_init_pwm_backlight(void)
     ledc_timer_config_t LCD_timer_config = {
         .speed_mode             = PWM_LCD_MODE,
         .duty_resolution        = PWM_LCD_RESOLUTION,
-        .timer_num              = PWM_LCD_CHANNEL,
+        .timer_num              = PWM_LCD_TIMER,
         .freq_hz                = PWM_LCD_FREQ,
         .clk_cfg                = LEDC_AUTO_CLK
     };
@@ -87,7 +87,7 @@ void st7735s_init_pwm_backlight(void)
         .speed_mode             = PWM_LCD_MODE,
         .channel                = PWM_LCD_CHANNEL,
         .intr_type              = LEDC_INTR_DISABLE,
-        .timer_sel              = PWM_LCD_GROUP,
+        .timer_sel              = PWM_LCD_TIMER,
         .duty                   = 0,
         .hpoint                 = 0
     };
@@ -95,12 +95,12 @@ void st7735s_init_pwm_backlight(void)
 }
 
 
-void st7735s_set_backlight(uint8_t percent)
+void st7735s_set_backlight(uint8_t percentage)
 {
-    if (percent > 100) {
-        percent = 100;
+    if (percentage > 100) {
+        percentage = 100;
     }
-    uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percent / 100;
+    uint32_t duty = (uint32_t) (pow(2, PWM_LCD_RESOLUTION) - 1) * percentage / 100;
     // Set duty cycle
     ESP_ERROR_CHECK(ledc_set_duty(PWM_LCD_MODE, PWM_LCD_CHANNEL, duty));
     // Update duty to apply the new value

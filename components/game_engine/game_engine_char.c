@@ -79,7 +79,7 @@ void compute_projectile(game_t *game, player_t *player, projectile_t *projectile
     projectile->physics.pos_x += projectile->physics.speed_x;
     projectile->physics.pos_y = projectile->slope * projectile->physics.pos_x + projectile->offset;
     // Check for collision with the environment
-    if (check_block_collisions(game->map, &projectile->physics, game->cam_row)) {
+    if (check_block_collisions(game->map, &projectile->physics, NULL, game->cam_row)) {
         memset(projectile, 0, sizeof(*projectile));
     }
     // Check for collision with the player
@@ -424,8 +424,10 @@ static void update_enemy_position(game_t *game, enemy_t *enemy)
  * @param game Pointer to the current game map.
  * @param player Pointer to the player_t object.
  * @param enemy Pointer to the enemy_t object.
+ * 
+ * @return 1 if the enemy is killed, else 0.
  */
-static void check_enemy_player_collision(game_t *game, player_t *player, enemy_t *enemy)
+static uint8_t check_enemy_player_collision(game_t *game, player_t *player, enemy_t *enemy)
 {
     if (player->physics.pos_x < enemy->physics.pos_x + BLOCK_SIZE &&
         player->physics.pos_x > enemy->physics.pos_x - BLOCK_SIZE &&
@@ -439,7 +441,6 @@ static void check_enemy_player_collision(game_t *game, player_t *player, enemy_t
         else {
             player->life--;
             game->reset = 1;
-            return;
         }
     }
     else if (player->physics.pos_x < enemy->physics.pos_x + BLOCK_SIZE &&
@@ -450,7 +451,9 @@ static void check_enemy_player_collision(game_t *game, player_t *player, enemy_t
         enemy->life--;
         initiate_jump(&player->physics, SPEED_INITIAL);
         player->timer = (uint32_t)game->timer;
+        return 1;
     }
+    return 0;
 }
 
 
@@ -586,7 +589,7 @@ uint8_t is_on_sight(const map_t *map, physics_t *shooter, physics_t *target)
 }
 
 
-void compute_enemy(game_t *game, player_t *player, enemy_t *enemy)
+void compute_enemy(game_t *game, player_t *player, enemy_t *enemy, music_t **music)
 {
     if (game == NULL) {
         printf("Error(update_enemy): game_t pointer is NULL.\n");
@@ -600,12 +603,18 @@ void compute_enemy(game_t *game, player_t *player, enemy_t *enemy)
         printf("Error(update_enemy): enemy_t pointer is NULL.\n");
         assert(enemy);
     }
+    if (music == NULL) {
+        printf("Error(update_enemy): music_t pointer is NULL.\n");
+        assert(music);
+    }
 
     if (update_enemy_state(enemy)) {
         return;
     }
     update_enemy_position(game, enemy);
-    check_enemy_player_collision(game, player, enemy);
+    if (check_enemy_player_collision(game, player, enemy)) {
+        cue_music(music, NULL, game->map->data[enemy->row][enemy->column]);
+    }
     // Check for lightstaff's usage from the player
     if (player->lightstaff && player->power_used) {
         uint8_t dist_x = abs(player->physics.pos_x - enemy->physics.pos_x);
@@ -615,7 +624,7 @@ void compute_enemy(game_t *game, player_t *player, enemy_t *enemy)
         }
     }
     // Check for block collisions and update position if necessary
-    if (check_block_collisions(game->map, &enemy->physics, game->cam_row)) {
+    if (check_block_collisions(game->map, &enemy->physics, NULL, game->cam_row)) {
         apply_reactive_force(&enemy->physics);
     }
     // Check if standing on a platform

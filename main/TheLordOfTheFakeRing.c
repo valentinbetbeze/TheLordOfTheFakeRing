@@ -8,9 +8,7 @@
  */
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include <math.h>
 
 #include "rom/ets_sys.h"
 #include "driver/gptimer.h"
@@ -18,10 +16,12 @@
 #include "gamepad.h"
 #include "st7735s_hal.h"
 #include "st7735s_graphics.h"
+#include "MH-FMD_driver.h"
 #include "game_engine.h"
 #include "fonts.h"
 #include "maps.h"
 #include "sprites.h"
+#include "musics.h"
 
 
 void app_main()
@@ -64,6 +64,9 @@ void app_main()
     st7735s_push_frame(tft_handle);
     st7735s_init_pwm_backlight();
     st7735s_set_backlight(50);
+
+    // Initialize buzzer
+    mhfmd_init_pwm();
 
     // Initialize timer instance
     const gptimer_config_t timer_config = {
@@ -134,12 +137,11 @@ void app_main()
         .adaptive = 1,
         .font = myFont
     };
-
     // Initialize and load game elements
     reset_records();
     load_platforms(game.map);
     spawn_enemies(game.map, game.cam_pos_x, game.cam_row, game.cam_row + NUM_BLOCKS_X + 1);
-
+    music_t *cued_music = NULL;
     // Create the player's character
     player_t player = {
         .life               = 3,
@@ -156,13 +158,20 @@ void app_main()
         .sprite.data        = sprite_player
     };
     #pragma endregion
-
+    
     // Start menu
+    uint8_t played_once = 0;
     while (!gamepad_poll_button(&button_A)) {
+        ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
+        game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
+        if (!played_once && play_music(&game, &music_intro)) {
+            played_once = 1;
+        }
+
         const char menu_txt1[] = "THE LORD OF\nTHE FAKE RING";
         const char menu_txt2[] = "PRESS 'A' TO PLAY";
         const text_t menu_txt1_obj = {
-            .color = RED,
+            .color = ORANGE,
             .pos_x = 30,
             .pos_y = 40,
             .font = myFont,
@@ -197,7 +206,7 @@ void app_main()
                 player.power_used = 1;
             }
             update_player_position(&game, &player, gamepad_read_joystick_axis(adc_handle, &joystick.axis_x));
-            if (check_block_collisions(game.map, &player.physics, game.cam_row)) {
+            if (check_block_collisions(game.map, &player.physics, &cued_music, game.cam_row)) {
                 apply_reactive_force(&player.physics);
             }
             for (uint8_t i = 0; i < MAX_PLATFORMS; i++) {
@@ -230,11 +239,15 @@ void app_main()
             // Spawn & compute enemies
             spawn_enemies(game.map, game.cam_pos_x, SPAWN_START(game.cam_row), SPAWN_END(game.cam_row) + 1);
             for (int i = 0; i < NUM_ENEMY_RECORDS; i++) {
-                compute_enemy(&game, &player, &enemies[i]);
+                compute_enemy(&game, &player, &enemies[i], &cued_music);
             }
             // Compute projectiles
             for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
                 compute_projectile(&game, &player, &projectiles[i]);
+            }
+            // Play music
+            if (cued_music != NULL && play_music(&game, cued_music)) {
+                cued_music = NULL; // No more music to play for now
             }
         }
 

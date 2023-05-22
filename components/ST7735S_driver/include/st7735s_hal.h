@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
@@ -126,11 +127,12 @@
 #endif
 #define LCD_SIZE            hypot(LCD_HEIGHT, LCD_WIDTH)
 
-#define PWM_LCD_GROUP       LEDC_TIMER_0
-#define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
-#define PWM_LCD_MODE        LEDC_LOW_SPEED_MODE
-#define PWM_LCD_FREQ        5000
+#define PWM_LCD_MODE        LEDC_HIGH_SPEED_MODE
 #define PWM_LCD_RESOLUTION  LEDC_TIMER_4_BIT
+#define PWM_LCD_TIMER       LEDC_TIMER_0
+#define PWM_LCD_FREQ        5000
+#define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
+
 
 #define TEXT_PADDING_X      1               // pixels                  
 #define TEXT_PADDING_Y      3               // pixels   
@@ -213,9 +215,9 @@ void st7735s_init_pwm_backlight(void);
 /**
  * @brief Set the backlight intensity of the TFT display.
  * 
- * @param[in] percent Backlight intensity in percentage.
+ * @param[in] percentage Backlight intensity in percentage.
  */
-void st7735s_set_backlight(uint8_t percent);
+void st7735s_set_backlight(uint8_t percentage);
 
 /**
  * @brief Initialize the TFT display.

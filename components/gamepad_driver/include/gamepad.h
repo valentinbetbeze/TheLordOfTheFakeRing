@@ -11,6 +11,7 @@
 
 
 #include <stdint.h>
+#include <assert.h>
 
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"

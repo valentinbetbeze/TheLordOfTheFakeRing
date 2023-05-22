@@ -1,6 +1,6 @@
 #include "game_engine.h"
 #include "esp_random.h"
-
+#include "musics.h"
 
 /**
  * @warning Do not initialize to {0}: blocks[] has its own initialization
@@ -211,7 +211,7 @@ uint8_t is_block_destroyed(const int16_t row, const int8_t column)
 }
 
 
-uint8_t check_block_collisions(const map_t *map, physics_t *physics, const uint16_t cam_row)
+uint8_t check_block_collisions(const map_t *map, physics_t *physics, music_t **music, const uint16_t cam_row)
 {   
     if (map == NULL) {
         printf("Error(check_block_collisions): map_t pointer is NULL.\n");
@@ -318,13 +318,31 @@ uint8_t check_block_collisions(const map_t *map, physics_t *physics, const uint1
                                     (!IS_SOLID(block_br) || is_block_destroyed(ref_row + 1, ref_col - 1)) && x_offset);
     }
     // Change interactive blocks state if appropriate
-    if (physics->top_collision && IS_INTERACTIVE(block_tl) && !is_block_destroyed(ref_row, ref_col) &&
-        x_offset <= BLOCK_SIZE / 2) {
+    if (physics->top_collision && !is_block_destroyed(ref_row, ref_col) && x_offset <= BLOCK_SIZE / 2) {
+        if (music != NULL) {
+            uint8_t record_index;
+            block_t *block = NULL;
+            if (get_block_record(&record_index, ref_row, ref_col)) {
+                block = &blocks[record_index];
+            }
+            cue_music(music, block, block_tl);
+        }
+        if (IS_INTERACTIVE(block_tl)) {
             set_block_as_hit(ref_row, ref_col, cam_row);
         }
-    else if (physics->top_collision && IS_INTERACTIVE(block_tr) && !is_block_destroyed(ref_row + 1, ref_col) &&
-             BLOCK_SIZE / 2 < x_offset) {
-        set_block_as_hit(ref_row + 1, ref_col, cam_row);
+    }
+    else if (physics->top_collision && !is_block_destroyed(ref_row + 1, ref_col) && BLOCK_SIZE / 2 < x_offset) {
+        if (music != NULL) {
+            uint8_t record_index;
+            block_t *block = NULL;
+            if (get_block_record(&record_index, ref_row + 1, ref_col)) {
+                block = &blocks[record_index];
+            }
+            cue_music(music, block, block_tr);
+        }
+        if (IS_INTERACTIVE(block_tr)) {
+            set_block_as_hit(ref_row + 1, ref_col, cam_row);
+        }
     }
     return (physics->top_collision || physics->bottom_collision || physics->left_collision || physics->right_collision);
 }

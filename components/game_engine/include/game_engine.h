@@ -12,8 +12,10 @@
 
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #include "st7735s_graphics.h"
+#include "MH-FMD_driver.h"
 
 
 /*************************************************
@@ -246,6 +248,16 @@ typedef enum {
 } enemy_type_t;
 
 
+typedef struct {
+    uint8_t playing :           1;      // 1 if the music is being played
+    uint8_t note_index;
+    uint32_t timer;
+    const uint16_t num_notes;           // Number of notes
+    const uint16_t duration;            // Note duration, in milliseconds
+    const uint16_t *data;               // Music data
+} music_t;
+
+
 /*************************************************
  * External variables
  *************************************************/
@@ -300,6 +312,35 @@ void reset_hit_flag_blocks(void);
  * @brief Reset all record logs.
  */
 void reset_records(void);
+
+/**
+ * @brief Flush the temporary data from a music_t object.
+ * 
+ * @param music Music to be flushed.
+ * 
+ * @note This function helps make sure the temporary data of a music_t
+ * object (timer, flags, etc.) is properly reset for any future use.
+ */
+void flush_music(music_t *music);
+
+/**
+ * @brief Select a music depending on the given block element.
+ * 
+ * @param[out] music Music to be selected.
+ * @param[in] block (Optional) Block record. Input NULL if not used.
+ * @param[in] block_type Block type that has been hit.
+ */
+void cue_music(music_t **music, block_t *block, const int8_t block_type);
+
+/**
+ * @brief Play the given music to the buzzer
+ * 
+ * @param[in] game Game flags.
+ * @param[in] music Music to be played.
+ * 
+ * @return 1 if the music is over, else 0.
+ */
+uint8_t play_music(const game_t *game, music_t *music);
 
 
 /*************************************************
@@ -366,6 +407,7 @@ uint8_t is_block_destroyed(const int16_t row, const int8_t column);
  * 
  * @param[in] map Current game map.
  * @param[in] physics Entity on which to check for collisions.
+ * @param[in] music Music pointer to host the music to be cued. Input NULL if no music is desired.
  * @param[in] cam_row Row at which the camera is positioned.
  * 
  * @return 1 if collision, else 0.
@@ -374,7 +416,7 @@ uint8_t is_block_destroyed(const int16_t row, const int8_t column);
  * physical object. Hence, a 'left' collision means that the object has a collision on its
  * left side.
  */
-uint8_t check_block_collisions(const map_t *map, physics_t *physics, const uint16_t cam_row);
+uint8_t check_block_collisions(const map_t *map, physics_t *physics, music_t **music, const uint16_t cam_row);
 
 /**
  * @brief Update the position of the given physics_t object, simulating reactive 
@@ -548,7 +590,7 @@ uint8_t is_on_sight(const map_t *map, physics_t *shooter, physics_t *target);
  * sight, etc.).
  * The projectile is then updated every iteration with the 
  */
-void compute_enemy(game_t *game, player_t *player, enemy_t *enemy);
+void compute_enemy(game_t *game, player_t *player, enemy_t *enemy, music_t **music);
 
 
 /*************************************************

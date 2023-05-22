@@ -7,7 +7,8 @@ set (SOURCES
 )
 
 set(LIB
-    st7735s
+    ST7735S_driver
+    MH-FMD_driver
     assets
 )
 

@@ -5,8 +5,9 @@ set (SOURCES
 set(LIB
     esp_rom
     driver
-    gamepad
-    st7735s
+    gamepad_driver
+    ST7735S_driver
+    MH-FMD_driver
     game_engine
     assets
 )

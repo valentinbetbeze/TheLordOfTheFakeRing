@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <assert.h>
 
 #include "driver/spi_common.h"
 #include "st7735s_hal.h"
@@ -26,8 +27,8 @@
  * Font parameters
  *************************************************/
 #define FONT_SIZE           (6)         // in pixel
-#define FIRST_ASCII         (32)
-#define LAST_ASCII          (90)
+#define FIRST_ASCII         (' ')
+#define LAST_ASCII          ('Z')
 #define LUMA_THRESHOLD      45
 
 
@@ -37,6 +38,7 @@
 #define RED                 (SPI_SWAP_DATA_TX(0xF800, 16))
 #define GREEN               (SPI_SWAP_DATA_TX(0x07E0, 16))
 #define BLUE                (SPI_SWAP_DATA_TX(0x001F, 16))
+#define ORANGE              (SPI_SWAP_DATA_TX(0xFC60, 16))
 #define DARK_GREEN          (SPI_SWAP_DATA_TX(0x2306, 16))
 #define LIGHT_BLUE          (SPI_SWAP_DATA_TX(0xD7DF, 16))
 #define YELLOW              (SPI_SWAP_DATA_TX(0xF7E0, 16))
@@ -44,7 +46,7 @@
 #define PURPLE              (SPI_SWAP_DATA_TX(0x4169, 16))
 #define WHITE               (0xFFFF)
 #define BLACK               (0x0000)
-#define GREY                (SPI_SWAP_DATA_TX(0x94D2, 16))
+#define GREY                (SPI_SWAP_DATA_TX(0xC658, 16))
 
 
 /*************************************************

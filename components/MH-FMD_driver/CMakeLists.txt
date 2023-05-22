@@ -1,13 +1,9 @@
 set (SOURCES
-    "fonts.c"
-    "maps.c"
-    "sprites.c"
-    "musics.c"
+    "MH-FMD_driver.c"
 )
 
 set(LIB
-    ST7735S_driver
-    game_engine
+    driver
 )
 
 idf_component_register(
