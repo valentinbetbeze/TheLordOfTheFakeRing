@@ -177,13 +177,17 @@ uint8_t play_music(const game_t *game, music_t *music)
     }
     // Change the note if the previous note duration has expired
     if ((uint64_t)(game->timer - music->timer) / music->duration) {
+        mhfmd_set_buzzer(0);
+        // Music is fully played
         if (music->note_index == music->num_notes - 1) {
-            // Music is fully played
             flush_music(music);
-            mhfmd_set_buzzer(0);        // Switch the buzzer off
             return 1;
         }
-        mhfmd_set_frequency(music->data[++music->note_index]);
+        // If next frequency is non-null, play it
+        if (music->data[++music->note_index]) {
+            mhfmd_set_frequency(music->data[music->note_index]);
+            mhfmd_set_buzzer(1);
+        }
         music->timer = (uint32_t)game->timer;
     }
     return 0;

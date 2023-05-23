@@ -145,7 +145,7 @@ void app_main()
     // Create the player's character
     player_t player = {
         .life               = 3,
-        .lightstaff         = 0,
+        .lightstaff         = 1,
         .shield             = 0,
         .forward            = 1,
         .physics.platform_i = -1,
@@ -164,12 +164,11 @@ void app_main()
     while (!gamepad_poll_button(&button_A)) {
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
+
         if (!played_once && play_music(&game, &music_intro)) {
             played_once = 1;
         }
-
         const char menu_txt1[] = "THE LORD OF\nTHE FAKE RING";
-        const char menu_txt2[] = "PRESS 'A' TO PLAY";
         const text_t menu_txt1_obj = {
             .color = ORANGE,
             .pos_x = 30,
@@ -178,6 +177,8 @@ void app_main()
             .data = menu_txt1,
             .size = sizeof(menu_txt1)
         };
+        st7735s_draw_text(&menu_txt1_obj);
+        const char menu_txt2[] = "PRESS 'A' TO PLAY";
         const text_t menu_txt2_obj = {
             .color = GREY,
             .pos_x = 20,
@@ -186,11 +187,12 @@ void app_main()
             .data = menu_txt2,
             .size = sizeof(menu_txt2)
         };
-        st7735s_draw_text(&menu_txt1_obj);
         st7735s_draw_text(&menu_txt2_obj);
         st7735s_push_frame(tft_handle);
         feed_watchdog_timer();
     }
+    flush_music(&music_intro);
+    mhfmd_set_buzzer(0);
 
     // Game loop
     while(player.life) {
@@ -203,6 +205,7 @@ void app_main()
             // Compute player
             check_player_state(&game, &player, gamepad_poll_button(&button_C));
             if (player.lightstaff && gamepad_poll_button(&button_A)) {
+                cued_music = &music_glamdring_blast;
                 player.power_used = 1;
             }
             update_player_position(&game, &player, gamepad_read_joystick_axis(adc_handle, &joystick.axis_x));
@@ -354,4 +357,5 @@ void app_main()
         st7735s_draw_text(&game_over_txt_obj);
         st7735s_push_frame(tft_handle);
     }
+    return;
 }
