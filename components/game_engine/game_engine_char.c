@@ -125,7 +125,7 @@ void check_player_state(game_t *game, player_t *player, const uint8_t is_jumping
     }
     else if ((player->physics.bottom_collision || player->physics.left_collision ||
                 player->physics.right_collision) && is_jumping) {
-        player->timer = (uint32_t)game->timer;
+        player->timer_y = (uint32_t)game->timer;
         initiate_jump(&player->physics, SPEED_JUMP_INIT);
     }
     else if ((player->physics.jumping && player->physics.top_collision) ||
@@ -150,29 +150,32 @@ void update_player_position(game_t *game, player_t *player, const int8_t x_axis_
         assert(player);
     }
     // Update x-position
-    if (0 < x_axis_value / 100) {
-        player->forward = 1;
-    }
-    else if (x_axis_value / 100 < 0){
-        player->forward = 0;
-    }
-    player->physics.pos_x += player->physics.speed_x * (int16_t)(x_axis_value / 100);
-    if (player->physics.pos_x - game->cam_pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
-        game->cam_moving = 1;
-        game->cam_pos_x += player->physics.speed_x; // Shift the map frame by 'speed_x' pixels
-        game->cam_row = (uint16_t)(game->cam_pos_x / BLOCK_SIZE);
-    }
-    else if (player->physics.pos_x < game->cam_pos_x) {
-        player->physics.pos_x = game->cam_pos_x;
-    }
-    else {
-        game->cam_moving = 0;
+    if ((game->timer - player->timer_x) / TIMESTEP_X > 1) {
+        if (0 < x_axis_value / 100) {
+            player->forward = 1;
+        }
+        else if (x_axis_value / 100 < 0){
+            player->forward = 0;
+        }
+        player->physics.pos_x += player->physics.speed_x * (int16_t)(x_axis_value / 100);
+        player->timer_x = game->timer;
+        if (player->physics.pos_x - game->cam_pos_x + BLOCK_SIZE / 2 > LCD_WIDTH / 2) {
+            game->cam_moving = 1;
+            game->cam_pos_x += player->physics.speed_x; // Shift the map frame by 'speed_x' pixels
+            game->cam_row = (uint16_t)(game->cam_pos_x / BLOCK_SIZE);
+        }
+        else if (player->physics.pos_x < game->cam_pos_x) {
+            player->physics.pos_x = game->cam_pos_x;
+        }
+        else {
+            game->cam_moving = 0;
+        }
     }
     // Update y-position
-    player->physics.accelerating = (game->timer - player->timer) / TIMESTEP_ACCEL;
+    player->physics.accelerating = (game->timer - player->timer_y) / TIMESTEP_ACCEL;
     if (player->physics.jumping) {
         if (player->physics.accelerating) {
-            player->timer = (uint32_t)game->timer;
+            player->timer_y = (uint32_t)game->timer;
             player->physics.accelerating = 0;
             player->physics.speed_y--; // Decelerating (due to gravity)
         }
@@ -181,7 +184,7 @@ void update_player_position(game_t *game, player_t *player, const int8_t x_axis_
     else {
         if (player->physics.falling && player->physics.accelerating &&
             player->physics.speed_y < BLOCK_SIZE / 2 - 1) {
-            player->timer = (uint32_t)game->timer;
+            player->timer_y = (uint32_t)game->timer;
             player->physics.accelerating = 0;
             player->physics.speed_y++;
         }
@@ -450,7 +453,7 @@ static uint8_t check_enemy_player_collision(game_t *game, player_t *player, enem
         // The enemy has been hit
         enemy->life--;
         initiate_jump(&player->physics, SPEED_INITIAL);
-        player->timer = (uint32_t)game->timer;
+        player->timer_y = (uint32_t)game->timer;
         return 1;
     }
     return 0;

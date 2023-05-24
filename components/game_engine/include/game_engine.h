@@ -32,11 +32,13 @@
 #define IS_INTERACTIVE(x)       (x >= BREAKABLE_BLOCK)
 // Items
 #define NUM_ITEMS               10          // Maximum number of items on one frame.
-#define TIMESTEP_BUMP_COIN      5           // In milliseconds
+#define TIMESTEP_BUMP_COIN      10          // In milliseconds
 #define HEIGHT_BUMP_COIN        36          // Bump height of a coin, in pixels
 #define SHIELD_ALPHA            0.7         // Shield color transparency  
 // Player
-#define TIMESTEP_ACCEL          200         // y-displacement delay in milliseconds 
+#define TIMESTEP_X              1           /* x-displacement delay in milliseconds
+                                               Created for later use.*/
+#define TIMESTEP_ACCEL          200         // y-displacement delay in milliseconds
 #define SPEED_INITIAL           1           // Player base speed
 #define SPEED_JUMP_INIT         2           // Jump 'impulsion' speed (v0)
 // Enemy
@@ -216,7 +218,8 @@ typedef struct {
     uint8_t power_used :        1;
     uint8_t coins;
     uint16_t spell_radius;
-    uint32_t timer;
+    uint32_t timer_x;
+    uint32_t timer_y;
     physics_t physics;
     sprite_t sprite;
 } player_t;

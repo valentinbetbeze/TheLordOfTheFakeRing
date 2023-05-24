@@ -23,51 +23,22 @@
 #include "sprites.h"
 #include "musics.h"
 
+#define REFRESH_RATE    45
 
 void app_main()
 {
     // Hardware initialization
     #pragma region
-    // Initialize non-SPI GPIOs
-    const gpio_config_t io_conf = {
-        .pin_bit_mask = ((1 << PIN_LCD_DC) | (1 << PIN_LCD_RES)),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE
-    };
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-
-    // Initialize SPI
-    const spi_bus_config_t spi_bus_cfg = {
-        .mosi_io_num = PIN_LCD_SDA,
-        .miso_io_num = -1,
-        .sclk_io_num = PIN_LCD_SCK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1
-    };
-    ESP_ERROR_CHECK(spi_bus_initialize(SPI_LCD_HOST, &spi_bus_cfg, SPI_LCD_DMA));
-    spi_device_handle_t tft_handle;
-    const spi_device_interface_config_t spi_dev_cfg = {
-        .clock_speed_hz = SPI_LCD_FREQUENCY,
-        .mode = SPI_LCD_MODE,                            
-        .spics_io_num = PIN_LCD_CS, 
-        .queue_size = SPI_LCD_QSIZE,
-        .flags = SPI_LCD_FLAGS,
-        .command_bits = 0,
-        .address_bits = 0,
-        .dummy_bits = 0
-    };
-    ESP_ERROR_CHECK(spi_bus_add_device(SPI_LCD_HOST, &spi_dev_cfg, &tft_handle));
-
     // Initialize LCD display
+    spi_device_handle_t tft_handle;
+    st7735s_init_spi(&tft_handle);
     st7735s_init_tft(tft_handle);
     st7735s_fill_background(BLACK);
     st7735s_push_frame(tft_handle);
     st7735s_init_pwm_backlight();
-    st7735s_set_backlight(50);
-
+    st7735s_set_backlight(100);
     // Initialize buzzer
     mhfmd_init_pwm();
-
     // Initialize timer instance
     const gptimer_config_t timer_config = {
         .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -78,13 +49,11 @@ void app_main()
     ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &timer_handle));
     ESP_ERROR_CHECK(gptimer_enable(timer_handle));
     ESP_ERROR_CHECK(gptimer_start(timer_handle));
-
     // Create and initialize joystick
     joystick_t joystick;
     gamepad_config_joystick(&joystick, JOY_MID_X, JOY_MID_Y);
     adc_oneshot_unit_handle_t adc_handle;
     gamepad_init_joystick(&adc_handle, &joystick);
-
     // Create and initialize buttons
     button_t button_A, button_C;
     gamepad_init_button(&button_A, PIN_BTN_A);
@@ -145,7 +114,7 @@ void app_main()
     // Create the player's character
     player_t player = {
         .life               = 3,
-        .lightstaff         = 1,
+        .lightstaff         = 0,
         .shield             = 0,
         .forward            = 1,
         .physics.platform_i = -1,
@@ -164,7 +133,7 @@ void app_main()
     while (!gamepad_poll_button(&button_A)) {
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
-
+        
         if (!played_once && play_music(&game, &music_intro)) {
             played_once = 1;
         }
@@ -195,10 +164,18 @@ void app_main()
     mhfmd_set_buzzer(0);
 
     // Game loop
+    uint64_t time = 0;
     while(player.life) {
         // Get the time for the current iteration
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
+
+        // Set the refresh rate at 45 Frame Per Second
+        if ((float)1000 / (game.timer - time) > REFRESH_RATE + 1) {
+            continue;
+        }
+        //printf("%3.0f FPS\n", (float)1000 / (game.timer - time));
+        time = game.timer;
 
         // Compute all game parameters & objects
         if (game.playing) {

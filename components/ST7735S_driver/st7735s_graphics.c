@@ -359,12 +359,6 @@ void st7735s_draw_sprite(const sprite_t *sprite)
     }
     for (uint8_t y = 0; y < sprite->height; y++) {
         for (uint8_t x = 0; x < sprite->width; x++) {
-
-            uint16_t color = sprite->data[y * sprite->width + x];
-            if (color == BLACK) { // Use black as transparency for sprites only
-                continue;
-            }
-
             int16_t pos_x, pos_y;
             if (sprite->flip_x) {
                 pos_x = sprite->pos_x + sprite->width - 1 - x;
@@ -388,7 +382,14 @@ void st7735s_draw_sprite(const sprite_t *sprite)
                 pos_x = sprite->pos_x + y;
                 pos_y = sprite->pos_y + sprite->width - 1 - x;
             }
-
+            uint16_t color = sprite->data[y * sprite->width + x];
+            // Use black as transparency for sprites only
+            if (color == BLACK && sprite->background_color) {
+                color = sprite->background_color;
+            }
+            else if (color == BLACK && !sprite->background_color) {
+                continue;
+            }
             write_to_frame(pos_x, pos_y, color, sprite->alpha);
         }
     }

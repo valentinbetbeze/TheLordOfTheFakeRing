@@ -125,6 +125,7 @@
 #else
     #error "LCD_MEMORY_BASE not recognized. Consult ST7735S datasheet."
 #endif
+#define LCD_NPIX            (LCD_HEIGHT * LCD_WIDTH)    // Number of pixels on the display
 #define LCD_SIZE            hypot(LCD_HEIGHT, LCD_WIDTH)
 
 #define PWM_LCD_MODE        LEDC_HIGH_SPEED_MODE
@@ -132,7 +133,6 @@
 #define PWM_LCD_TIMER       LEDC_TIMER_0
 #define PWM_LCD_FREQ        5000
 #define PWM_LCD_CHANNEL     LEDC_CHANNEL_0
-
 
 #define TEXT_PADDING_X      1               // pixels                  
 #define TEXT_PADDING_Y      3               // pixels   
@@ -146,7 +146,17 @@
 #define SPI_LCD_QSIZE       1
 #define SPI_LCD_HOST        VSPI_HOST
 #define SPI_LCD_MODE        (0)
-#define SPI_LCD_DMA         SPI_DMA_DISABLED
+/**
+ * @warning Update the macros below from the enum spi_common_dma_t
+ * in spi_common.h if any value has changed due to future API updates.
+ * Current API version used: v5.0.1
+ */
+#define SPI_DMA_DISABLED    (0)             // Not updated automatically
+#define SPI_DMA_CH1         (1)             // Not updated automatically
+#define SPI_DMA_CH2         (2)             // Not updated automatically
+#define SPI_DMA_CH_AUTO     (3)             // Not updated automatically
+
+#define SPI_LCD_DMA         SPI_DMA_CH_AUTO
 
 
 /*************************************************
@@ -182,12 +192,16 @@
 #endif
 /* Maximum amount of 2-byte data sent per SPI transaction. Set for 
  16-bit color format.*/
-#define PX_PER_TRANSACTION  (MAX_TRANSFER_SIZE / 2)
+#define PX_PER_TRANSACTION  (MAX_TRANSFER_SIZE / sizeof(uint16_t))
+/* Check how many pixels will remain in the last transaction
+ (if 0, the last transaction is full)*/ 
+#define REMAINING_PIXELS    (LCD_NPIX % (MAX_TRANSFER_SIZE / sizeof(uint16_t)))
 
 
 /*************************************************
  * Extern variables
  *************************************************/
+
 /**
  * @brief 2D-array representing the display frame to be sent to the
  * TFT LCD screen. 
@@ -218,6 +232,14 @@ void st7735s_init_pwm_backlight(void);
  * @param[in] percentage Backlight intensity in percentage.
  */
 void st7735s_set_backlight(uint8_t percentage);
+
+/**
+ * @brief Initialize the bus and handle to enable SPI communication
+ * with the TFT display.
+ * 
+ * @param handle Handle of the TFT display for the SPI bus.
+ */
+void st7735s_init_spi(spi_device_handle_t *handle);
 
 /**
  * @brief Initialize the TFT display.

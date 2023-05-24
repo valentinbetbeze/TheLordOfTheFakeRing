@@ -139,24 +139,24 @@ static void bump_block(const game_t *game, block_t *block, sprite_t *sprite)
  * @brief Create a yellow spotlight effect over the specified location.
  * 
  * @param game Game flags.
- * @param row Row of the block on which to add the spotlight.
- * @param column Column of the block on which to add the spotlight.
+ * @param x x-center of the spotlight (reference: map_x = 0).
+ * @param y y-center of the spotlight (reference: display).
  * @param radius Spotlight radius, in pixels.
  */
-static void create_spotlight(const game_t *game, const int16_t row, const int8_t column, const uint8_t radius)
+static void create_spotlight(const game_t *game, const int16_t x, const int8_t y, const uint8_t radius)
 {
     circle_t circle = {
-        .pos_y = column * BLOCK_SIZE + 6,
+        .pos_y = y,
         .color = YELLOW_1,
         .alpha = 0.8,
         .radius = radius,
     };
     // Simple light animation
     if (game->timer % 4 < 2) {
-        circle.pos_x = row * BLOCK_SIZE - game->cam_pos_x + 7;
+        circle.pos_x = x - game->cam_pos_x + 7;
     }
     else {
-        circle.pos_x = row * BLOCK_SIZE - game->cam_pos_x + 9;
+        circle.pos_x = x - game->cam_pos_x + 9;
     }
     st7735s_draw_circle(&circle);
 }
@@ -274,7 +274,7 @@ static void draw_block(const game_t *game, const int16_t row, const int8_t colum
                     st7735s_draw_rectangle(&rectangle);
                     break;
                 case MORIA:
-                    create_spotlight(game, row, column, 10);
+                    create_spotlight(game, row * BLOCK_SIZE, column * BLOCK_SIZE + 5, 10);
                     sprite.flip_x = 1;
                     sprite.data = sprite_torch;
                     break;
@@ -295,7 +295,7 @@ static void draw_block(const game_t *game, const int16_t row, const int8_t colum
                     sprite.data = moria_block_1;
                     break;
                 case MORIA:
-                    create_spotlight(game, row, column, 10);
+                    create_spotlight(game, row * BLOCK_SIZE - 1, column * BLOCK_SIZE + 5, 10);
                     sprite.data = sprite_torch;
                     break;
                 default: break;

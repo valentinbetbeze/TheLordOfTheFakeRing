@@ -30,7 +30,8 @@ void reset_player(game_t *game, player_t *player)
     player->forward                      = 1;
     player->power_used                   = 0;
     player->spell_radius                 = 0;
-    player->timer                        = 0;
+    player->timer_x                      = 0;
+    player->timer_y                      = 0;
     player->coins                        = 0;
     player->physics.pos_x                = game->map->start_row * BLOCK_SIZE;
     player->physics.pos_y                = (NUM_BLOCKS_Y - game->map->start_column - 1) * BLOCK_SIZE;

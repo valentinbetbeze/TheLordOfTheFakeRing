@@ -113,10 +113,11 @@ typedef struct {
     uint8_t flip_y :    1;  // Flip sprite on y-axis
     uint8_t CW_90 :     1;  // 90° clockwise rotation
     uint8_t ACW_90 :    1;  // 90° anti-clockwise rotation
-    int16_t pos_x;          // Top-left x-position
-    int16_t pos_y;          // Top-left y-position
     uint8_t height;         // Width in pixels
     uint8_t width;          // Width in pixels
+    int16_t pos_x;          // Top-left x-position
+    int16_t pos_y;          // Top-left y-position
+    uint16_t background_color;
     float alpha;
     const uint16_t *data;   // Pointer to sprite data
 } sprite_t;
