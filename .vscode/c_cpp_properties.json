@@ -3,8 +3,11 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/components/*",
+                "${workspaceFolder}/console_firmware/**",
+                "${workspaceFolder}/controller_firmware/**",
+                "${workspaceFolder}/console_firmware/components/*",
+                "${workspaceFolder}/controller_firmware/components/*",
+                "${workspaceFolder}/controller_firmware/build/config/*",
                 "C:/esp/esp-idf/**"
             ],
             "defines": [
