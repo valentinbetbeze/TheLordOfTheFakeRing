@@ -13,7 +13,7 @@ To play the game, the following hardware is needed:
     <li><b>x1</b> Funduino Joystick Shield V1.A</li>
     <li><b>x1</b> Breadboard</li>
     <li><b>x2</b> micro-B(M) / A USB cables</li>
-    <li> Jumper cables or Dupont wires (jumper wires are more reliable)</li>
+    <li>Jumper wires</li>
 </ul>
 
 ### Software
@@ -80,9 +80,9 @@ The <b>ESP-IDF framework</b> is necessary to build the firmware's object files. 
     <li>Clone the repository with <code>git clone https://github.com/valentinbetbeze/TheLordOfTheFakeRing.git</code></li>
     <li>Open the ESP-IDF CMD/Powershell and navigate to the repository folder.</li>
     <li>Go to the <b>controller's folder.</b></li>
-    <li>Build and flash the application with <code>idf.py flash -p COM{port_number}</code> replacing "{port_number}" with the <i>controller</i>'s COM port number.</li>
-    <li>Once the build is complete and flashed, go to the <b>console's folder.</b></li>
-    <li>Run the application with <code>idf.py flash -p COM{port_number}</code> replacing "{port_number}" with the <i>console</i>'s USB port number.</li>
+    <li>Build and flash the application with <code>idf.py flash -p COM</code> adding the <i>controller</i>'s USB port number directly after <code>COM</code>.</li>
+    <li>Once the build is complete and flashed, go to the <b>console's folder</b>.</li>
+    <li>Run and flash the application with <code>idf.py flash -p COM</code> adding the <i>console</i>'s USB port number directly after <code>COM</code>.</li>
     <li>You can start playing.</li>
     <li>To start over, push the RST button on the console's ESP32. Warning: all progress will be lost!</li>
 </ol>
