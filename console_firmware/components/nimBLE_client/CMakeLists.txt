@@ -10,6 +10,7 @@ set(LIB
     bt
     freertos
     soc
+    gamepad_driver
 )
 
 idf_component_register(

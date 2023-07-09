@@ -68,7 +68,7 @@
         "stdio.h": "c",
         "ble.h": "c",
         "mh-fmd_driver.h": "c",
-        "utils.h": "c"
+        "utils.h": "c",
     },
     "explorer.autoReveal": "focusNoScroll"
 }

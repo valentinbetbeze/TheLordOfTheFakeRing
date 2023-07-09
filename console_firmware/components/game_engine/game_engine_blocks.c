@@ -3,7 +3,7 @@
 #include "musics.h"
 
 /**
- * @warning Do not initialize to {0}: blocks[] has its own initialization
+ * @warning Do not initialize with {0} -> the array has its own initialization
  * function as some parameters shall be set at specific values before
  * the program runs. See initialize_blocks_records().
  */
@@ -266,7 +266,7 @@ uint8_t check_block_collisions(const map_t *map, physics_t *physics,
         block_tl = map->data[ref_row][ref_col];           // top-left block
         block_tr = map->data[ref_row + 1][ref_col];       // top-right block
         block_bl = map->data[ref_row][ref_col - 1];       // bottom-left block
-        block_br = map->data[ref_row + 1][ref_col - 1];   // bottom-right block    
+        block_br = map->data[ref_row + 1][ref_col - 1];   // bottom-right block
     }
 
     // Check if the object is within any potential collision area

@@ -15,19 +15,11 @@
 #include "services/gap/ble_svc_gap.h"
 #include "esp_central.h"
 
-/**
- * @brief Store the previous and current states of a button
- * variable to allow filtering its desired value.
- */
-typedef struct {
-    uint8_t pre_state;  // previous state
-    uint8_t cur_state;  // current state
-    uint8_t value;      // post-processed value
-} ble_button_t;
+#include "gamepad.h"
 
 extern int8_t ble_axis_X;
-extern ble_button_t ble_button_A;
-extern ble_button_t ble_button_C;
+extern button_t ble_button_A;
+extern button_t ble_button_C;
 
 /**
  * @brief Initialize the BLE client on the ESP32 central

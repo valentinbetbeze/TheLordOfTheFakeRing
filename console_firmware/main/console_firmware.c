@@ -1,6 +1,6 @@
 /**
  * @author valentin betbeze (valentin.betbeze@gmail.com)
- * @brief Source code of the game's console.
+ * @brief Source code of the ESP32's console.
  * @date 2023-04-16
  */
 
@@ -23,7 +23,7 @@
 #include "sprites.h"
 #include "musics.h"
 
-#define REFRESH_RATE    45
+#define REFRESH_RATE    35
 
 
 void app_main()
@@ -56,7 +56,7 @@ void app_main()
     // Game initialization & UI
     #pragma region
     game_t game = {
-        .playing = 1,
+        .running = 1,
         .map = &map_shire
     };
     const char coins_text[] = "COIN: ";
@@ -123,13 +123,13 @@ void app_main()
     
     // Start menu
     uint8_t played_once = 0;
-    while (ble_button_A.value == 0) {
+    while (!ble_button_A.pushed) {
         nimBLE_client_read_gamepad();
 
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
         
-        if (!played_once && play_music(&game, NULL)) { //&music_intro
+        if (!played_once && play_music(&game, &music_intro)) {
             played_once = 1;
         }
         const char menu_txt1[] = "THE LORD OF\nTHE FAKE RING";
@@ -159,25 +159,26 @@ void app_main()
     mhfmd_set_buzzer(0);
 
     // Game loop
-    uint64_t time = 0;
-    while(player.life) {
+    uint64_t fps_timer = 0;
+    while(!game.over) {
         // Get the time for the current iteration
         ESP_ERROR_CHECK(gptimer_get_raw_count(timer_handle, &game.timer));
         game.timer = (uint64_t)game.timer / 10; // Convert to milliseconds
 
-        // Set the refresh rate at 45 Frame Per Second
-        if ((float)1000 / (game.timer - time) > REFRESH_RATE + 1) {
+        // Cap the refresh rate
+        if ((float)1000 / (game.timer - fps_timer) > REFRESH_RATE + 1) {
             continue;
         }
+        fps_timer = game.timer;
 
         // Read gamepad from BLE server
         nimBLE_client_read_gamepad();
 
         // Compute all game parameters & objects
-        if (game.playing) {
+        if (game.running) {
             // Compute player
-            check_player_state(&game, &player, ble_button_C.value);
-            if (player.lightstaff && ble_button_A.value) {
+            check_player_state(&game, &player, ble_button_C.pushed);
+            if (player.lightstaff && ble_button_A.pushed) {
                 cued_music = &music_glamdring_blast;
                 player.power_used = 1;
             }
@@ -221,10 +222,11 @@ void app_main()
             for (uint8_t i = 0; i < MAX_PROJECTILES; i++) {
                 compute_projectile(&game, &player, &projectiles[i]);
             }
-            // Play music
-            if (cued_music != NULL && play_music(&game, cued_music)) {
-                cued_music = NULL; // No more music to play for now
-            }
+        }
+
+        // Play music
+        if (cued_music != NULL && play_music(&game, cued_music)) {
+            cued_music = NULL; // No more music to play for now
         }
 
         // Build the frame
@@ -239,10 +241,10 @@ void app_main()
         
         // Check & update game state
         #pragma region
-        if (!game.playing || game.map->end_row * BLOCK_SIZE < player.physics.pos_x) {
+        if (!game.running || game.map->end_row * BLOCK_SIZE < player.physics.pos_x) {
             switch (game.map->id) {
                 case SHIRE:
-                    game.playing = 0;
+                    game.running = 0;
                     if (transition_screen(BLACK, 1)) {
                         const char transition_txt[] = "THE MINES\nOF MORIA";
                         const text_t transition_txt_obj = {
@@ -261,10 +263,10 @@ void app_main()
                     }
                     break;
                 case MORIA:
-                    game.playing = 0; 
+                    game.running = 0; 
                     if (player.physics.pos_x == game.map->start_row * BLOCK_SIZE) {
                         if (transition_screen(BLACK, 0)) {
-                            game.playing = 1;
+                            game.running = 1;
                         }
                     }
                     else if (transition_screen(WHITE, 1)) {
@@ -279,13 +281,16 @@ void app_main()
                         };
                         st7735s_draw_text(&transition_txt_obj);
                         st7735s_push_frame(tft_handle);
-                        player.life = 0; // Game is finished
-                        game.won = 1;
+                        game.over = 1;
                     }
                     break;
             }
         }
-        if (game.reset) {
+        if (player.life == 0) {
+            game.over = 1;
+            ets_delay_us(1*1000*1000);
+        }
+        else if (game.reset) {
             reset_game_flags(&game);
             reset_player(&game, &player);
             reset_records();
@@ -316,7 +321,7 @@ void app_main()
     }
 
     // Game over screen
-    if (!game.won) {
+    if (player.life == 0) {
         const char game_over_txt[] = "GAME OVER";
         const text_t game_over_txt_obj = {
             .color = WHITE,

@@ -9,7 +9,6 @@
 #ifndef __GAMEPAD_H__
 #define __GAMEPAD_H__
 
-
 #include <stdint.h>
 #include <assert.h>
 
@@ -22,9 +21,9 @@
 /*************************************************
  * GPIOs and Constants
  *************************************************/
-#define PIN_BTN_A		GPIO_NUM_21
-#define PIN_BTN_C       GPIO_NUM_5
-#define PIN_JOY_X       GPIO_NUM_4
+#define PIN_BTN_A		GPIO_NUM_0
+#define PIN_BTN_C       GPIO_NUM_0
+#define PIN_JOY_X       GPIO_NUM_0
 
 #define JOY_MIN_N       (0)             // Minimum ADC raw value for all axes
 #define JOY_MID_X       (1920)          // ADC raw value while x-axis is idle

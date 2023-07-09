@@ -1,6 +1,6 @@
 #include "MH-FMD_driver.h"
 
-#define PIN_BUZZER      26
+#define PIN_BUZZER      GPIO_NUM_26
 
 
 void mhfmd_init_pwm(void)

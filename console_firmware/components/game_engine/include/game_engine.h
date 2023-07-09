@@ -86,10 +86,10 @@ typedef struct {
  * @brief Game state flags & variables.
  */
 typedef struct {
-    uint8_t won :           1;
+    uint8_t over :          1;
     uint8_t reset :         1;  // Reset the character at the beginning of the map
     uint8_t init :          1;  // Initialize a game map
-    uint8_t playing :       1;  // The game is running & the player has full control of its character
+    uint8_t running :       1;  // The game is running & the player has full control of its character
     uint8_t cam_moving :    1;  // The camera is moving
     uint8_t coins;
     uint16_t cam_pos_x;         // First pixel x-coordinate of the current map frame
@@ -252,7 +252,7 @@ typedef enum {
 
 
 typedef struct {
-    uint8_t playing :           1;      // 1 if the music is being played
+    uint8_t playing :           1;      // 1 if the music is playing
     uint8_t note_index;
     uint32_t timer;
     const uint16_t num_notes;           // Number of notes

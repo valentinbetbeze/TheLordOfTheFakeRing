@@ -1,7 +1,7 @@
 #include "ble_client.h"
 
 int8_t ble_axis_X;
-ble_button_t ble_button_A, ble_button_C;
+button_t ble_button_A, ble_button_C;
 
 static const char *TAG = "NimBLE_BLE_CENT";
 static const char CONTROLLER_NAME[] = "ESP32_CONTROLLER";
@@ -395,7 +395,7 @@ static int read_button_A(uint16_t conn_handle,
                          struct ble_gatt_attr *attr, void *arg)
 {
     if (error->status == 0) {
-        ble_button_A.cur_state = *(attr->om->om_data);
+        ble_button_A.current_state = *(attr->om->om_data);
     }
     else {
         MODLOG_DFLT(ERROR, "Error: Failed to read ble_button_A");
@@ -409,32 +409,12 @@ static int read_button_C(uint16_t conn_handle,
                          struct ble_gatt_attr *attr, void *arg)
 {
     if (error->status == 0) {
-        ble_button_C.cur_state = *(attr->om->om_data);
+        ble_button_C.current_state = *(attr->om->om_data);
     }
     else {
         MODLOG_DFLT(ERROR, "Error: Failed to read ble_button_A");
     }
     return 0;
-}
-
-/**
- * @brief Filter the state of a button to make it valid only once upon
- * being pressed.
- * 
- * @param button Button to filter
- */
-static void filter_button_state(ble_button_t *button)
-{
-    if (button->cur_state != button->pre_state) {
-        // Update previous state
-        button->pre_state = button->cur_state;
-        // If button is pressed
-        if (button->cur_state == 1) {
-            button->value = 1;
-            return;
-        }
-    }
-    button->value = 0;
 }
 
 
@@ -476,8 +456,8 @@ void nimBLE_client_read_gamepad(void)
     ble_gattc_read(myconn_handle, chr_handles[0], read_axis_X, NULL);
 
     ble_gattc_read(myconn_handle, chr_handles[1], read_button_A, NULL);
-    filter_button_state(&ble_button_A);
+    filter_push_signal(&ble_button_A);
 
     ble_gattc_read(myconn_handle, chr_handles[2], read_button_C, NULL);
-    filter_button_state(&ble_button_C);
+    filter_push_signal(&ble_button_C);
 }

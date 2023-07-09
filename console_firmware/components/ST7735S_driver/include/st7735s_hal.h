@@ -29,7 +29,7 @@
  * LCD GPIO
  ************************************************/
 #define PIN_LCD_SCK         GPIO_NUM_18     // Serial Clock            
-#define PIN_LCD_SDA         GPIO_NUM_23     // Bi-directional MOSI/MISO
+#define PIN_LCD_SDA         GPIO_NUM_23     // MOSI
 #define PIN_LCD_CS          GPIO_NUM_5      // Chip Selection          
 #define PIN_LCD_RES         GPIO_NUM_2      // Reset                   
 #define PIN_LCD_DC          GPIO_NUM_15     // Register Selection      

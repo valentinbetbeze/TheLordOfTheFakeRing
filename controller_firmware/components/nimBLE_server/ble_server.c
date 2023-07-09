@@ -300,14 +300,14 @@ static int gatt_svr_chr_access(uint16_t conn_handle,
 
     if (ble_uuid_cmp(uuid, &gatt_svr_chr_button_A_uuid.u) == 0) {
         assert(ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR);
-        uint8_t state_button_A = !gpio_get_level(button_A.gpio_num);
+        uint8_t state_button_A = gpio_get_level(button_A.gpio_num);
         rc = os_mbuf_append(ctxt->om, &state_button_A, sizeof(state_button_A));
         return (rc == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
 
     if (ble_uuid_cmp(uuid, &gatt_svr_chr_button_C_uuid.u) == 0) {
         assert(ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR);
-        uint8_t state_button_C = !gpio_get_level(button_C.gpio_num);
+        uint8_t state_button_C = gpio_get_level(button_C.gpio_num);
         rc = os_mbuf_append(ctxt->om, &state_button_C, sizeof(state_button_C));
         return (rc == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
